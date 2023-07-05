@@ -47,7 +47,7 @@ use std::{collections::HashMap, sync::Mutex};
 
 use clap::Parser;
 
-const UPDATE_RATE: Duration = Duration::new(5, 0);
+const UPDATE_RATE: Duration = Duration::new(0, 5000);
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -236,16 +236,16 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr, client_kind: User
                     tokio::time::sleep(UPDATE_RATE).await;
                 }
 
-                println!("Sending close to {who}...");
-                if let Err(e) = sender
-                    .send(Message::Close(Some(CloseFrame {
-                        code: axum::extract::ws::close_code::NORMAL,
-                        reason: Cow::from("Goodbye"),
-                    })))
-                    .await
-                {
-                    println!("Could not send Close due to {}, probably it is ok?", e);
-                }
+                // println!("Sending close to {who}...");
+                // if let Err(e) = sender
+                //     .send(Message::Close(Some(CloseFrame {
+                //         code: axum::extract::ws::close_code::NORMAL,
+                //         reason: Cow::from("Goodbye"),
+                //     })))
+                //     .await
+                // {
+                //     println!("Could not send Close due to {}, probably it is ok?", e);
+                // }
                 n_msg
             });
 

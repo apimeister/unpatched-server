@@ -20,11 +20,12 @@ use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
     response::IntoResponse,
     routing::get,
-    Router,
+    Router, Json, http::StatusCode,
 };
 use axum_extra::TypedHeader;
+use serde::{Deserialize, Serialize};
 
-use std::borrow::Cow;
+use std::{borrow::Cow, time::Duration};
 use std::ops::ControlFlow;
 use std::{net::SocketAddr, path::PathBuf};
 use tower_http::{
@@ -46,6 +47,8 @@ use std::{collections::HashMap, sync::Mutex};
 
 use clap::Parser;
 
+const UPDATE_RATE: Duration = Duration::new(5, 0);
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -55,7 +58,7 @@ struct Args {
     port: String,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct AgentData {
     host_name: String,
     os_release: String,
@@ -86,6 +89,7 @@ async fn main() {
     let app = Router::new()
         .fallback_service(ServeDir::new(assets_dir).append_index_html_on_directories(true))
         .route("/ws", get(ws_handler))
+        .route("/api", get(stats_api))
         // logging so we can see whats going on
         .layer(
             TraceLayer::new_for_http()
@@ -218,7 +222,7 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr, client_kind: User
             let (mut sender, mut receiver) = socket.split();
 
             // Spawn a task that will push several messages to the client (does not matter what client does)
-            let mut send_task = tokio::spawn(async move {
+            let send_task = tokio::spawn(async move {
                 let n_msg = 20;
                 for i in 0..n_msg {
                     // In case of any websocket error, we exit.
@@ -229,8 +233,7 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr, client_kind: User
                     {
                         return i;
                     }
-
-                    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                    tokio::time::sleep(UPDATE_RATE).await;
                 }
 
                 println!("Sending close to {who}...");
@@ -247,7 +250,7 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr, client_kind: User
             });
 
             // This second task will receive messages from client and print them on server console
-            let mut recv_task = tokio::spawn(async move {
+            let recv_task = tokio::spawn(async move {
                 let mut cnt = 0;
                 while let Some(Ok(msg)) = receiver.next().await {
                     cnt += 1;
@@ -260,22 +263,22 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr, client_kind: User
             });
 
             // If any one of the tasks exit, abort the other.
-            tokio::select! {
-                rv_a = (&mut send_task) => {
-                    match rv_a {
-                        Ok(a) => println!("{} messages sent to {}", a, who),
-                        Err(a) => println!("Error sending messages {:?}", a)
-                    }
-                    recv_task.abort();
-                },
-                rv_b = (&mut recv_task) => {
-                    match rv_b {
-                        Ok(b) => println!("Received {} messages", b),
-                        Err(b) => println!("Error receiving messages {:?}", b)
-                    }
-                    send_task.abort();
-                }
-            }
+            // tokio::select! {
+            //     rv_a = (&mut send_task) => {
+            //         match rv_a {
+            //             Ok(a) => println!("{} messages sent to {}", a, who),
+            //             Err(a) => println!("Error sending messages {:?}", a)
+            //         }
+            //         recv_task.abort();
+            //     },
+            //     rv_b = (&mut recv_task) => {
+            //         match rv_b {
+            //             Ok(b) => println!("Received {} messages", b),
+            //             Err(b) => println!("Error receiving messages {:?}", b)
+            //         }
+            //         send_task.abort();
+            //     }
+            // }
         }
     }
 
@@ -375,3 +378,13 @@ fn process_message(msg: Message, who: SocketAddr, client_kind: &User) -> Control
 
     ControlFlow::Continue(())
 }
+
+async fn stats_api() -> (StatusCode, Json<Vec<AgentData>>) {
+    match GLOBAL_CACHE.lock() {
+        Ok(res) => {
+            let v_ad = res.values().cloned().collect::<Vec<AgentData>>();
+            ( StatusCode::OK, Json(v_ad))
+        }
+        Err(_) => (StatusCode::NOT_FOUND, Json(Vec::new()))
+    }}
+

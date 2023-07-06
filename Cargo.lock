@@ -173,28 +173,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "axum-extra"
-version = "0.7.4"
-source = "git+https://github.com/tokio-rs/axum#b80d1261377a59d7a498f1f3b8f8d160e1c61d9e"
-dependencies = [
- "axum",
- "axum-core",
- "bytes",
- "futures-util",
- "headers",
- "http",
- "http-body 0.4.5",
- "mime",
- "pin-project-lite",
- "serde",
- "tokio",
- "tower",
- "tower-http",
- "tower-layer",
- "tower-service",
-]
-
-[[package]]
 name = "backtrace"
 version = "0.3.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1021,7 +999,6 @@ name = "monitoring-server"
 version = "0.1.0"
 dependencies = [
  "axum",
- "axum-extra",
  "clap",
  "futures",
  "futures-util",

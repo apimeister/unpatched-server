@@ -1,6 +1,6 @@
 use std::path::Path;
 
-fn main(){
+fn main() {
     let base = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let sources = Path::new(&base).join("page");
     let destination = Path::new(&base).join("target").join("page");

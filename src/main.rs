@@ -16,10 +16,10 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqlitePool},
     Row,
 };
+use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
 use std::vec;
-use std::{net::SocketAddr, path::PathBuf};
 use tower_http::{
     services::ServeDir,
     trace::{DefaultMakeSpan, TraceLayer},
@@ -75,14 +75,10 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
-
     let pool = create_datase().await;
 
-    let web_page = ServeDir::new(
-        WEBPAGE.path().join("target").join("page"),
-    )
-    .append_index_html_on_directories(true);
+    let web_page = ServeDir::new(WEBPAGE.path().join("target").join("page"))
+        .append_index_html_on_directories(true);
 
     // build our application with some routes
     let app = Router::new()
@@ -97,7 +93,7 @@ async fn main() {
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
-    
+
     let addr: SocketAddr = format!("{}:{}", args.bind, args.port).parse().unwrap();
     tracing::debug!("listening on {}", addr);
     axum::Server::bind(&addr)

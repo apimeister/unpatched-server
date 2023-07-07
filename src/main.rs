@@ -1,8 +1,3 @@
-use std::str::FromStr;
-use std::time::Duration;
-use std::vec;
-use std::{net::SocketAddr, path::PathBuf};
-
 use axum::{
     extract::connect_info::ConnectInfo,
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
@@ -14,17 +9,24 @@ use axum::{
 };
 use clap::Parser;
 use futures::{sink::SinkExt, stream::StreamExt};
+use include_dir::{include_dir, Dir};
 use serde::{Deserialize, Serialize};
 use sqlx::{
     query,
     sqlite::{SqliteConnectOptions, SqlitePool},
     Row,
 };
+use std::str::FromStr;
+use std::time::Duration;
+use std::vec;
+use std::{net::SocketAddr, path::PathBuf};
 use tower_http::{
     services::ServeDir,
     trace::{DefaultMakeSpan, TraceLayer},
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+static WEBPAGE: Dir = include_dir!("$CARGO_MANIFEST_DIR/target/page");
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -76,9 +78,14 @@ async fn main() {
 
     let pool = create_datase().await;
 
+    let web_page = ServeDir::new(
+        WEBPAGE.path().join("target").join("page"),
+    )
+    .append_index_html_on_directories(true);
+
     // build our application with some routes
     let app = Router::new()
-        .fallback_service(ServeDir::new(assets_dir).append_index_html_on_directories(true))
+        .fallback_service(web_page)
         .route("/ws", get(ws_handler).with_state(pool.clone()))
         .route("/api", get(stats_api).with_state(pool))
         // logging so we can see whats going on

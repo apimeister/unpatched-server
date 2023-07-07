@@ -1,2 +1,5 @@
 /target
 *.db
+/page/public
+/page/resources
+.hugo_build.lock

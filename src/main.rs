@@ -64,6 +64,7 @@ const SQLITE_DB: &str = "sqlite:monitor_server_internal.db";
 
 #[tokio::main]
 async fn main() {
+    let args = Args::parse();
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -87,18 +88,15 @@ async fn main() {
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
         );
 
-    // run it with hyper
-    let args = Args::parse();
-    let listener = tokio::net::TcpListener::bind(args.bind + ":" + args.port.as_str())
+    // run our app with hyper
+    // `axum::Server` is a re-export of `hyper::Server`
+    
+    let addr: SocketAddr = format!("{}:{}", args.bind, args.port).parse().unwrap();
+    tracing::debug!("listening on {}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service_with_connect_info::<SocketAddr>())
         .await
         .unwrap();
-    tracing::debug!("listening on {}", listener.local_addr().unwrap());
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .await
-    .unwrap();
 }
 
 /// The handler for the HTTP request (this gets called when the HTTP GET lands at the start

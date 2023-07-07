@@ -1,2 +1,4 @@
 /target
 *.db
+/page/public
+.hugo_build.lock

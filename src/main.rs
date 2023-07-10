@@ -43,6 +43,14 @@ struct AgentData {
     alias: String,
     os_release: String,
     uptime: u32,
+    memory: AgentDataMemory,
+}
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+struct AgentDataMemory {
+    used_mem: u32,
+    free_mem: u32,
+    av_mem: u32,
+    total_mem: u32,
 }
 
 impl AgentData {
@@ -57,7 +65,10 @@ enum AllowedFields {
     Id(String),
     Alias(String),
     OsRelease(String),
+    // FIXME: uptime could be f32 or u32 to have a real check
     Uptime(String),
+    // FIXME: Memory could be split into sub enum for the available info
+    Memory(String),
     Discard,
 }
 
@@ -148,7 +159,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                         "uuid" => {
                             id = Some(AllowedFields::Id(v.to_string()));
                             let mut conn = pool.acquire().await.unwrap();
-                            let id_res = query(r#"INSERT INTO data(id, name, uptime, os_release) VALUES (?, "", 0, "")"#).bind(v).execute(&mut *conn).await;
+                            let id_res = query(r#"INSERT INTO data(id, name, uptime, os_release, used_mem, free_mem, av_mem, total_mem) VALUES (?, "", 0, "", 0, 0, 0, 0)"#).bind(v).execute(&mut *conn).await;
                             // TO-DO: This should be some real error handling
                             if id_res.is_err() {
                                 println!("Agent with Id {v} already known")
@@ -161,12 +172,13 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                             let (time, _) = v.split_once('.').unwrap_or((v, v));
                             AllowedFields::Uptime(time.to_string())
                         }
+                        "memory" => AllowedFields::Memory(v.to_string()),
                         _ => AllowedFields::Discard,
                     };
                 }
                 Message::Binary(_) => println!("Binary is unsupported!"),
             };
-            // TODO: implement something with this who
+            // FIXME: implement something with this who
             let _who = who;
 
             // without ID, skip and wait for next update cycle
@@ -176,6 +188,25 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     AllowedFields::Alias(v) => ("name", v),
                     AllowedFields::Uptime(v) => ("uptime", v),
                     AllowedFields::OsRelease(v) => ("os_release", v),
+                    AllowedFields::Memory(v) => {
+                        println!("Received some data for memory: {v}");
+                        let mem_vec: Vec<&str> = v.split('/').collect();
+                        let free_mem = *mem_vec.first().unwrap();
+                        let used_mem = *mem_vec.get(1).unwrap();
+                        let av_mem = *mem_vec.get(2).unwrap();
+                        let total_mem = *mem_vec.get(3).unwrap();
+                        let _ = query(r#"UPDATE data SET used_mem = ?, free_mem = ?, av_mem = ?, total_mem = ? WHERE id = ?"#)
+                    .bind(used_mem)
+                    .bind(free_mem)
+                    .bind(av_mem)
+                    .bind(total_mem)
+                    .bind(agent_id)
+                    .execute(&mut *conn)
+                    .await
+                    .unwrap();
+
+                        continue;
+                    }
                     _ => continue,
                 };
 
@@ -209,6 +240,10 @@ async fn stats_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<Vec<Agen
         agent.alias = d.get::<String, _>("name");
         agent.uptime = d.get::<u32, _>("uptime");
         agent.os_release = d.get::<String, _>("os_release");
+        agent.memory.used_mem = d.get::<u32, _>("used_mem");
+        agent.memory.free_mem = d.get::<u32, _>("free_mem");
+        agent.memory.av_mem = d.get::<u32, _>("av_mem");
+        agent.memory.total_mem = d.get::<u32, _>("total_mem");
         agents_vec.push(agent);
     }
 
@@ -234,7 +269,11 @@ async fn create_datase() -> SqlitePool {
                 id VARCHAR(36) PRIMARY KEY NOT NULL,
                 name VARCHAR(255),
                 uptime INT,
-                os_release VARCHAR(255)
+                os_release VARCHAR(255),
+                free_mem INT,
+                used_mem INT,
+                av_mem INT,
+                total_mem INT
             )"#,
         )
         .execute(&mut *conn)

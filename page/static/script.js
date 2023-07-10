@@ -8,7 +8,18 @@
       let htmlContent = '';
       obj.forEach(item => {
         const uptime = parseSeconds(item.uptime);
-        htmlContent += `<p>Alias: ${item.alias}, ID: ${item.id}, OS Version: ${item.os_release}, Uptime: ${uptime.hours}:${uptime.minutes}:${uptime.seconds}</p>`;
+        const free_mem = parseMem(item.memory.free_mem);
+        const av_mem = parseMem(item.memory.av_mem);
+        const used_mem = parseMem(item.memory.used_mem);
+        const total_mem = parseMem(item.memory.total_mem);
+        htmlContent += `<p>
+        Alias: ${item.alias}, 
+        ID: ${item.id}, 
+        OS Version: ${item.os_release}, 
+        Uptime: ${uptime.hours}:${uptime.minutes}:${uptime.seconds},
+        Memory (GB): used ${used_mem.gb} | free ${free_mem.gb} | available ${av_mem.gb} | total ${total_mem.gb},
+        Memory (MB): used ${used_mem.mb} | free ${free_mem.mb} | available ${av_mem.mb} | total ${total_mem.mb}
+        </p>`;
       });
       divElement.innerHTML = htmlContent;
     } catch (error) {
@@ -22,5 +33,11 @@
     let seconds = Math.floor((inp % 3600) % 60);
     seconds = seconds < 10 ? '0' + seconds : seconds;
     return { hours, minutes, seconds };
+  }
+
+  function parseMem(i) {
+    const mb = Math.floor(i / 1024);
+    const gb = Math.floor(i / (1024*1024));
+    return { mb, gb }
   }
   

@@ -24,8 +24,8 @@ use tower_http::{
     services::ServeDir,
     trace::{DefaultMakeSpan, TraceLayer},
 };
+use tracing::{debug, error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
 static WEBPAGE: Dir = include_dir!("$CARGO_MANIFEST_DIR/target/page");
 
 #[derive(Parser, Debug)]
@@ -81,11 +81,11 @@ async fn main() {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "example_websockets=debug,tower_http=debug".into()),
+                .unwrap_or_else(|_| "tower_http=debug,info".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
-
+    info!("Starting unpatched server...");
     let pool = create_datase().await;
 
     let web_page = ServeDir::new(WEBPAGE.path().join("target").join("page"))
@@ -96,17 +96,13 @@ async fn main() {
         .fallback_service(web_page)
         .route("/ws", get(ws_handler).with_state(pool.clone()))
         .route("/api", get(stats_api).with_state(pool))
-        // logging so we can see whats going on
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
         );
 
-    // run our app with hyper
-    // `axum::Server` is a re-export of `hyper::Server`
-
     let addr: SocketAddr = format!("{}:{}", args.bind, args.port).parse().unwrap();
-    tracing::debug!("listening on {}", addr);
+    debug!("listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service_with_connect_info::<SocketAddr>())
         .await
@@ -151,8 +147,12 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
             let mut data = AllowedFields::Discard;
             match msg {
                 Message::Close(_) => break,
-                Message::Ping(_) => println!("Received a Ping!"),
-                Message::Pong(_) => println!("Received a Pong!"),
+                Message::Ping(v) => {
+                    let alias = std::str::from_utf8(&v).unwrap_or("");
+                    debug!("Received a Ping!");
+                    info!("Client {alias} Connected from {who}");
+                }
+                Message::Pong(_) => debug!("Received a Pong!"),
                 Message::Text(t) => {
                     let (k, v) = t.split_once(':').unwrap();
                     data = match k {
@@ -162,7 +162,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                             let id_res = query(r#"INSERT INTO data(id, name, uptime, os_release, used_mem, free_mem, av_mem, total_mem) VALUES (?, "", 0, "", 0, 0, 0, 0)"#).bind(v).execute(&mut *conn).await;
                             // TO-DO: This should be some real error handling
                             if id_res.is_err() {
-                                println!("Agent with Id {v} already known")
+                                debug!("Agent with Id {v} already known")
                             }
                             AllowedFields::Id(v.to_string())
                         }
@@ -176,7 +176,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                         _ => AllowedFields::Discard,
                     };
                 }
-                Message::Binary(_) => println!("Binary is unsupported!"),
+                Message::Binary(_) => error!("Binary is unsupported!"),
             };
             // FIXME: implement something with this who
             let _who = who;
@@ -189,7 +189,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     AllowedFields::Uptime(v) => ("uptime", v),
                     AllowedFields::OsRelease(v) => ("os_release", v),
                     AllowedFields::Memory(v) => {
-                        println!("Received some data for memory: {v}");
+                        debug!("Received some data for memory: {v}");
                         let mem_vec: Vec<&str> = v.split('/').collect();
                         let free_mem = *mem_vec.first().unwrap();
                         let used_mem = *mem_vec.get(1).unwrap();
@@ -210,7 +210,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     _ => continue,
                 };
 
-                println!("Received some data for {field}: {value}");
+                debug!("Received some data for {field}: {value}");
 
                 let _ = query(format!(r#"UPDATE data SET {field} = ? WHERE id = ?"#).as_str())
                     .bind(value)

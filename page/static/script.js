@@ -3,7 +3,7 @@
   
     try {
       const obj = await res.json();
-      console.log(obj);
+      console.table(obj);
       const divElement = document.getElementById('jsonDiv');
       let htmlContent = '';
       obj.forEach(item => {
@@ -15,10 +15,11 @@
         htmlContent += `<p>
         Alias: ${item.alias}, 
         ID: ${item.id}, 
-        OS Version: ${item.os_release}, 
-        Uptime: ${uptime.hours}:${uptime.minutes}:${uptime.seconds},
-        Memory (GB): used ${used_mem.gb} | free ${free_mem.gb} | available ${av_mem.gb} | total ${total_mem.gb},
-        Memory (MB): used ${used_mem.mb} | free ${free_mem.mb} | available ${av_mem.mb} | total ${total_mem.mb}
+        OS Version: ${item.os_release}</p>
+        <p>Uptime: ${uptime.hours}:${uptime.minutes}:${uptime.seconds}</p>
+        <p>Memory (GB): used ${used_mem.gb} | free ${free_mem.gb} | available ${av_mem.gb} | total ${total_mem.gb}</p>
+        <p>Memory (MB): used ${used_mem.mb} | free ${free_mem.mb} | available ${av_mem.mb} | total ${total_mem.mb}</p>
+        <p>Memory (KB): used ${used_mem.kb} | free ${free_mem.kb} | available ${av_mem.kb} | total ${total_mem.kb}</p>
         </p>`;
       });
       divElement.innerHTML = htmlContent;
@@ -36,8 +37,9 @@
   }
 
   function parseMem(i) {
-    const mb = Math.floor(i / 1024);
-    const gb = Math.floor(i / (1024*1024));
-    return { mb, gb }
+    const kb = Math.floor(i / 1024);
+    const mb = Math.floor(kb / 1024);
+    const gb = Math.floor(mb / 1024);
+    return { kb, mb, gb }
   }
   

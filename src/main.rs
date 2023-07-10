@@ -42,15 +42,15 @@ struct AgentData {
     id: String,
     alias: String,
     os_release: String,
-    uptime: u32,
+    uptime: i64,
     memory: AgentDataMemory,
 }
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct AgentDataMemory {
-    used_mem: u32,
-    free_mem: u32,
-    av_mem: u32,
-    total_mem: u32,
+    used_mem: i64,
+    free_mem: i64,
+    av_mem: i64,
+    total_mem: i64,
 }
 
 impl AgentData {
@@ -238,12 +238,12 @@ async fn stats_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<Vec<Agen
         let mut agent = AgentData::new();
         agent.id = d.get::<String, _>("id");
         agent.alias = d.get::<String, _>("name");
-        agent.uptime = d.get::<u32, _>("uptime");
+        agent.uptime = d.get::<i64, _>("uptime");
         agent.os_release = d.get::<String, _>("os_release");
-        agent.memory.used_mem = d.get::<u32, _>("used_mem");
-        agent.memory.free_mem = d.get::<u32, _>("free_mem");
-        agent.memory.av_mem = d.get::<u32, _>("av_mem");
-        agent.memory.total_mem = d.get::<u32, _>("total_mem");
+        agent.memory.used_mem = d.get::<i64, _>("used_mem");
+        agent.memory.free_mem = d.get::<i64, _>("free_mem");
+        agent.memory.av_mem = d.get::<i64, _>("av_mem");
+        agent.memory.total_mem = d.get::<i64, _>("total_mem");
         agents_vec.push(agent);
     }
 

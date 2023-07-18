@@ -24,8 +24,9 @@ use tower_http::{
     services::ServeDir,
     trace::{DefaultMakeSpan, TraceLayer},
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
 static WEBPAGE: Dir = include_dir!("$CARGO_MANIFEST_DIR/target/page");
 
 #[derive(Parser, Debug)]
@@ -72,12 +73,34 @@ impl FromStr for UnitListInternal {
     }
 }
 
+impl FromStr for AgentDataMemory {
+    type Err = AgentDataMemoryError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let split: Vec<u64> = s
+            .split('/')
+            .map(|item| item.parse::<u64>().unwrap_or_default())
+            .collect();
+        if split.len() != 4 {
+            return Err(AgentDataMemoryError);
+        }
+        Ok(AgentDataMemory {
+            free_mem: split[0],
+            used_mem: split[1],
+            av_mem: split[2],
+            total_mem: split[3],
+        })
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct AgentDataMemoryError;
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct AgentDataMemory {
-    used_mem: i64,
-    free_mem: i64,
-    av_mem: i64,
-    total_mem: i64,
+    used_mem: u64,
+    free_mem: u64,
+    av_mem: u64,
+    total_mem: u64,
 }
 
 impl AgentData {
@@ -94,8 +117,7 @@ enum AllowedFields {
     OsRelease(String),
     // FIXME: uptime could be f32 or u32 to have a real check
     Uptime(String),
-    // FIXME: Memory could be split into sub enum for the available info
-    Memory(String),
+    Memory(AgentDataMemory),
     Units(Vec<UnitListInternal>),
     Discard,
 }
@@ -187,7 +209,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                         "uuid" => {
                             id = Some(AllowedFields::Id(v.to_string()));
                             let mut conn = pool.acquire().await.unwrap();
-                            let id_res = query(r#"INSERT INTO data(id, name, uptime, os_release, used_mem, free_mem, av_mem, total_mem, units) VALUES (?, "", 0, "", 0, 0, 0, 0, "")"#).bind(v).execute(&mut *conn).await;
+                            let id_res = query(r#"INSERT INTO data( id, name, uptime, os_release, memory, units ) VALUES ( ?, "", 0, "", "", "" )"#).bind(v).execute(&mut *conn).await;
                             // TO-DO: This should be some real error handling
                             if id_res.is_err() {
                                 debug!("Agent with Id {v} already known")
@@ -200,7 +222,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                             let (time, _) = v.split_once('.').unwrap_or((v, v));
                             AllowedFields::Uptime(time.to_string())
                         }
-                        "memory" => AllowedFields::Memory(v.to_string()),
+                        "memory" => AllowedFields::Memory(AgentDataMemory::from_str(v).unwrap()),
                         "unit" => {
                             let lines = v.lines();
                             let rem_value = v.lines().next().unwrap();
@@ -229,26 +251,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     AllowedFields::Uptime(v) => ("uptime", v),
                     AllowedFields::OsRelease(v) => ("os_release", v),
                     AllowedFields::Units(v) => ("units", serde_json::to_string(&v).unwrap()),
-                    AllowedFields::Memory(v) => {
-                        debug!("Received some data for memory: {v}");
-                        let mem_vec: Vec<&str> = v.split('/').collect();
-                        let free_mem = *mem_vec.first().unwrap();
-                        let used_mem = *mem_vec.get(1).unwrap();
-                        let av_mem = *mem_vec.get(2).unwrap();
-                        let total_mem = *mem_vec.get(3).unwrap();
-                        let res = query(r#"UPDATE data SET used_mem = ?, free_mem = ?, av_mem = ?, total_mem = ? WHERE id = ?"#)
-                    .bind(used_mem)
-                    .bind(free_mem)
-                    .bind(av_mem)
-                    .bind(total_mem)
-                    .bind(agent_id)
-                    .execute(&mut *conn)
-                    .await;
-                        if res.is_err() {
-                            warn!("Memory data could not be pushed to internal DB");
-                        }
-                        continue;
-                    }
+                    AllowedFields::Memory(v) => ("memory", serde_json::to_string(&v).unwrap()),
                     _ => continue,
                 };
 
@@ -282,10 +285,7 @@ async fn stats_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<Vec<Agen
         agent.alias = d.get::<String, _>("name");
         agent.uptime = d.get::<i64, _>("uptime");
         agent.os_release = d.get::<String, _>("os_release");
-        agent.memory.used_mem = d.get::<i64, _>("used_mem");
-        agent.memory.free_mem = d.get::<i64, _>("free_mem");
-        agent.memory.av_mem = d.get::<i64, _>("av_mem");
-        agent.memory.total_mem = d.get::<i64, _>("total_mem");
+        agent.memory = serde_json::from_str(d.get::<String, _>("memory").as_str()).unwrap();
         agent.units = serde_json::from_str(d.get::<String, _>("units").as_str()).unwrap();
         agents_vec.push(agent);
     }
@@ -313,10 +313,7 @@ async fn create_datase() -> SqlitePool {
                 name VARCHAR(255),
                 uptime INT,
                 os_release VARCHAR(255),
-                free_mem INT,
-                used_mem INT,
-                av_mem INT,
-                total_mem INT,
+                memory VARCHAR(255),
                 units VARCHAR(255)
             )"#,
         )

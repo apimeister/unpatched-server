@@ -24,8 +24,9 @@ use tower_http::{
     services::ServeDir,
     trace::{DefaultMakeSpan, TraceLayer},
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
 static WEBPAGE: Dir = include_dir!("$CARGO_MANIFEST_DIR/target/page");
 
 #[derive(Parser, Debug)]

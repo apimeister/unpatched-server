@@ -6,12 +6,22 @@
       console.table(obj);
       const divElement = document.getElementById('jsonDiv');
       let htmlContent = '';
+      const agents = document.getElementById("agents");
       obj.forEach(item => {
         const uptime = parseSeconds(item.uptime);
         const free_mem = parseMem(item.memory.free_mem);
         const av_mem = parseMem(item.memory.av_mem);
         const used_mem = parseMem(item.memory.used_mem);
         const total_mem = parseMem(item.memory.total_mem);
+        htmlContent += `<li>
+                  <div class="collapsible-header">
+                    <i class="material-icons">filter_drama</i>
+                    First
+                    <span class="new badge">4</span></div>
+                  <div class="collapsible-body"><p>Lorem ipsum dolor sit amet.</p></div>
+                </li>`
+
+
         htmlContent += `<p>
         Alias: ${item.alias}, 
         ID: ${item.id}, 
@@ -20,7 +30,11 @@
         <p>Memory (GB): used ${used_mem.gb} | free ${free_mem.gb} | available ${av_mem.gb} | total ${total_mem.gb}</p>
         <p>Memory (MB): used ${used_mem.mb} | free ${free_mem.mb} | available ${av_mem.mb} | total ${total_mem.mb}</p>
         <p>Memory (KB): used ${used_mem.kb} | free ${free_mem.kb} | available ${av_mem.kb} | total ${total_mem.kb}</p>
-        </p>`;
+        </p>
+        `;
+        item.units.forEach(svc => {
+          htmlContent += `<p>${svc.unit_file}</p>` 
+        });
       });
       divElement.innerHTML = htmlContent;
     } catch (error) {

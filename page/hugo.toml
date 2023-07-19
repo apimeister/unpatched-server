@@ -1,3 +1,19 @@
-baseURL = 'http://example.org/'
+baseURL = 'http://unpatched.dev/'
 languageCode = 'en-us'
-title = 'My New Hugo Site'
+title = 'Unpatched Server'
+theme = 'dtz-theme-hugo'
+
+[menu]
+  [[menu.main]]
+    name = "DASHBOARD"
+    url = "/"
+    weight = 1
+  [[menu.main]]
+    name = "CHARGE"
+    url = "/charge"
+    weight = 2
+
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true

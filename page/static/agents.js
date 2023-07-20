@@ -14,7 +14,6 @@ export default {
         watchEffect(async () => { 
             if (currentId.value) {
                 agent_detail.value = await (await fetch(`/api/v1/agents/${currentId.value}`)).json();
-                console.log(agent_detail);
             }
              })
 

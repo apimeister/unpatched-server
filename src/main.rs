@@ -20,12 +20,13 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
 use std::vec;
+use systemctl::Unit;
 use tower_http::{
     services::ServeDir,
     trace::{DefaultMakeSpan, TraceLayer},
 };
 use tracing::{debug, error, info};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter};
 
 static WEBPAGE: Dir = include_dir!("$CARGO_MANIFEST_DIR/target/page");
 
@@ -45,70 +46,14 @@ struct AgentData {
     os_release: String,
     uptime: i64,
     memory: AgentDataMemory,
-    units: Vec<UnitListInternal>,
+    units: Vec<Unit>,
 }
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct UnitListInternalError;
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct UnitListInternal {
-    pub unit_file: String,
-    pub state: String,
-    pub vendor_preset: String,
-}
-
-impl FromStr for UnitListInternal {
-    type Err = UnitListInternalError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let split: Vec<&str> = s.split('/').collect();
-        if split.len() != 3 {
-            return Err(UnitListInternalError);
-        }
-        Ok(UnitListInternal {
-            unit_file: split[0].into(),
-            state: split[1].into(),
-            vendor_preset: split[2].into(),
-        })
-    }
-}
-
-impl FromStr for AgentDataMemory {
-    type Err = AgentDataMemoryError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let split: Vec<u64> = s
-            .split('/')
-            .map(|item| item.parse::<u64>().unwrap_or_default())
-            .collect();
-        if split.len() != 4 {
-            return Err(AgentDataMemoryError);
-        }
-        Ok(AgentDataMemory {
-            free_mem: split[0],
-            used_mem: split[1],
-            av_mem: split[2],
-            total_mem: split[3],
-        })
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct AgentDataMemoryError;
-
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct AgentDataMemory {
     used_mem: u64,
     free_mem: u64,
     av_mem: u64,
     total_mem: u64,
-}
-
-impl AgentData {
-    fn new() -> AgentData {
-        AgentData {
-            ..Default::default()
-        }
-    }
 }
 
 enum AllowedFields {
@@ -118,22 +63,19 @@ enum AllowedFields {
     // FIXME: uptime could be f32 or u32 to have a real check
     Uptime(String),
     Memory(AgentDataMemory),
-    Units(Vec<UnitListInternal>),
+    Units(Vec<Unit>),
     Discard,
 }
 
 const UPDATE_RATE: Duration = Duration::new(5, 0);
-const SQLITE_DB: &str = "sqlite:monitor_server_internal.db";
+const SQLITE_DB: &str = "sqlite:monitor_server_internal.sqlite";
 
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "tower_http=debug,info".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
+    registry()
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
+        .with(fmt::layer())
         .init();
     info!("Starting unpatched server...");
     let pool = create_datase().await;
@@ -222,19 +164,8 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                             let (time, _) = v.split_once('.').unwrap_or((v, v));
                             AllowedFields::Uptime(time.to_string())
                         }
-                        "memory" => AllowedFields::Memory(AgentDataMemory::from_str(v).unwrap()),
-                        "unit" => {
-                            let lines = v.lines();
-                            let rem_value = v.lines().next().unwrap();
-                            let mut units = Vec::new();
-                            let rem_v_tuple = UnitListInternal::from_str(rem_value).unwrap();
-                            units.push(rem_v_tuple);
-                            for line in lines {
-                                let v = UnitListInternal::from_str(line).unwrap();
-                                units.push(v);
-                            }
-                            AllowedFields::Units(units)
-                        }
+                        "memory" => AllowedFields::Memory(serde_json::from_str(v).unwrap()),
+                        "units" => AllowedFields::Units(serde_json::from_str(v).unwrap()),
                         _ => AllowedFields::Discard,
                     };
                 }
@@ -280,13 +211,14 @@ async fn stats_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<Vec<Agen
     let mut agents_vec: Vec<AgentData> = vec![];
 
     for d in show_data {
-        let mut agent = AgentData::new();
-        agent.id = d.get::<String, _>("id");
-        agent.alias = d.get::<String, _>("name");
-        agent.uptime = d.get::<i64, _>("uptime");
-        agent.os_release = d.get::<String, _>("os_release");
-        agent.memory = serde_json::from_str(d.get::<String, _>("memory").as_str()).unwrap();
-        agent.units = serde_json::from_str(d.get::<String, _>("units").as_str()).unwrap();
+        let agent = AgentData {
+            id: d.get::<String, _>("id"),
+            alias: d.get::<String, _>("name"),
+            uptime: d.get::<i64, _>("uptime"),
+            os_release: d.get::<String, _>("os_release"),
+            memory: serde_json::from_str(d.get::<String, _>("memory").as_str()).unwrap(),
+            units: serde_json::from_str(d.get::<String, _>("units").as_str()).unwrap(),
+        };
         agents_vec.push(agent);
     }
 

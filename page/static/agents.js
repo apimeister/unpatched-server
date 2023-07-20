@@ -5,12 +5,18 @@ export default {
         M.AutoInit()
     },
     setup() {
-        const API_URL = '/api';
         const agents = ref(null);
-        watchEffect(async () => {
-            const url = `${API_URL}`;
-            agents.value = await (await fetch(url)).json();
-          })
+        watchEffect(async () => { 
+            agents.value = await (await fetch('/api/v1/agents')).json();
+        })
+        const agent_detail = ref(null);
+        let currentId = ref(null)
+        watchEffect(async () => { 
+            if (currentId.value) {
+                agent_detail.value = await (await fetch(`/api/v1/agents/${currentId.value}`)).json();
+                console.log(agent_detail);
+            }
+             })
 
         function parseUptime(inp) {
             const hours = Math.floor(inp / 3600);
@@ -31,6 +37,8 @@ export default {
 
         return {
             agents,
+            agent_detail,
+            currentId,
             parseUptime,
             bytesToSize
         }
@@ -38,11 +46,12 @@ export default {
     
     template: /*html*/`
     <ul class="collapsible">
-        <li v-for="agent in agents">
+        <li v-for="agent in agents" :id="agent.id" @click="currentId = agent.id">
             <div class="collapsible-header">
                 <i class="material-icons">fingerprint</i>
-                {{ agent.alias }}
+                <span>{{ agent.alias }}</span>
                 <span>Uptime: {{ parseUptime(agent.uptime) }}</span>
+                <span>OS Version: {{ agent.os_release }}</span>
                 <span class="new badge" data-badge-caption="units">{{ agent.units.length }}</span>
             </div>
             <div class="collapsible-body">
@@ -50,7 +59,9 @@ export default {
                 <p>ID: {{ agent.id }}</p>
                 <p>OS Version: {{ agent.os_release }}</p>
                 <p>Uptime: {{ parseUptime(agent.uptime) }}</p>
-                <p>Memory: used {{ bytesToSize(agent.memory.used_mem) }} | free {{ bytesToSize(agent.memory.free_mem) }} | available {{ bytesToSize(agent.memory.av_mem) }} | total {{ bytesToSize(agent.memory.total_mem) }}</p>
+                <p v-if="agent_detail">Memory: used {{ bytesToSize(agent_detail.memory.used_mem) }} | free {{ bytesToSize(agent_detail.memory.free_mem) }} | available {{ bytesToSize(agent_detail.memory.av_mem) }} | total {{ bytesToSize(agent_detail.memory.total_mem) }}</p>
+                <p v-if="agent_detail" >Units:</p>
+                <p v-if="agent_detail" v-for="unit in agent_detail.units">{{unit.name}}</p>
             </div>
         </li>
     </ul>`

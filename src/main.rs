@@ -1,7 +1,10 @@
 use axum::{
     extract::connect_info::ConnectInfo,
-    extract::ws::{Message, WebSocket, WebSocketUpgrade},
     extract::State,
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        Path,
+    },
     http::StatusCode,
     response::IntoResponse,
     routing::get,
@@ -27,6 +30,7 @@ use tower_http::{
 };
 use tracing::{debug, error, info};
 use tracing_subscriber::{fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter};
+use uuid::Uuid;
 
 static WEBPAGE: Dir = include_dir!("$CARGO_MANIFEST_DIR/target/page");
 
@@ -87,7 +91,11 @@ async fn main() {
     let app = Router::new()
         .fallback_service(web_page)
         .route("/ws", get(ws_handler).with_state(pool.clone()))
-        .route("/api", get(stats_api).with_state(pool))
+        .route(
+            "/api/v1/agents/:id",
+            get(single_agent_api).with_state(pool.clone()),
+        )
+        .route("/api/v1/agents", get(agents_api).with_state(pool))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
@@ -201,9 +209,12 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     let _ = recv_handle.await;
 }
 
-async fn stats_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<Vec<AgentData>>) {
+async fn agents_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<Vec<AgentData>>) {
     let mut conn = pool.acquire().await.unwrap();
-    let show_data = match query("SELECT * FROM data").fetch_all(&mut *conn).await {
+    let show_data = match query("SELECT id, name, uptime, os_release, memory FROM data")
+        .fetch_all(&mut *conn)
+        .await
+    {
         Ok(d) => d,
         Err(_) => return (StatusCode::NOT_FOUND, Json(Vec::new())),
     };
@@ -216,13 +227,36 @@ async fn stats_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<Vec<Agen
             alias: d.get::<String, _>("name"),
             uptime: d.get::<i64, _>("uptime"),
             os_release: d.get::<String, _>("os_release"),
-            memory: serde_json::from_str(d.get::<String, _>("memory").as_str()).unwrap(),
-            units: serde_json::from_str(d.get::<String, _>("units").as_str()).unwrap(),
+            ..Default::default()
         };
         agents_vec.push(agent);
     }
 
     (StatusCode::OK, Json(agents_vec))
+}
+
+async fn single_agent_api(
+    Path(id): Path<Uuid>,
+    State(pool): State<SqlitePool>,
+) -> (StatusCode, Json<AgentData>) {
+    let mut conn = pool.acquire().await.unwrap();
+    let show_data = match query("SELECT * FROM data WHERE id = ?")
+        .bind(id.to_string())
+        .fetch_one(&mut *conn)
+        .await
+    {
+        Ok(d) => d,
+        Err(_) => return (StatusCode::NOT_FOUND, Json(AgentData::default())),
+    };
+    let single_agent = AgentData {
+        id: show_data.get::<String, _>("id"),
+        alias: show_data.get::<String, _>("name"),
+        uptime: show_data.get::<i64, _>("uptime"),
+        os_release: show_data.get::<String, _>("os_release"),
+        memory: serde_json::from_str(show_data.get::<String, _>("memory").as_str()).unwrap(),
+        units: serde_json::from_str(show_data.get::<String, _>("units").as_str()).unwrap(),
+    };
+    (StatusCode::OK, Json(single_agent))
 }
 
 /// create database

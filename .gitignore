@@ -4,3 +4,4 @@
 /page/public
 /page/resources
 .hugo_build.lock
+lcov.info

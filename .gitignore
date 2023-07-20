@@ -1,5 +1,6 @@
 /target
 *.db
+*.sqlite
 /page/public
 /page/resources
 .hugo_build.lock

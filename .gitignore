@@ -7,3 +7,4 @@
 /site/resources
 .hugo_build.lock
 lcov.info
+.DS_Store

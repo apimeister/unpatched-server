@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+    {{- partial "head.html" . -}}
+    <body style="display: flex;flex-direction: column;min-height: 100vh;">
+        {{- partial "header.html" . -}}
+        <div style="flex-grow:1;display:flex;flex-direction: column;">
+        {{- block "main" . }}{{- end }}
+        </div>
+        {{- partial "footer.html" . -}}
+    </body>
+</html>

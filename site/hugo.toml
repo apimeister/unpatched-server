@@ -1,3 +1,18 @@
-baseURL = 'http://example.org/'
+baseURL = 'http://unpatched.dev/'
 languageCode = 'en-us'
-title = 'My New Hugo Site'
+title = 'Unpatched Server'
+
+[menu]
+  [[menu.main]]
+    name = "OVERVIEW"
+    url = "/"
+    weight = 1
+  [[menu.main]]
+    name = "NEXT"
+    url = "/next"
+    weight = 2
+
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true

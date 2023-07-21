@@ -3,5 +3,8 @@
 *.sqlite
 /page/public
 /page/resources
+/site/public
+/site/resources
 .hugo_build.lock
 lcov.info
+.DS_Store

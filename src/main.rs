@@ -81,7 +81,6 @@ async fn main() {
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .with(fmt::layer())
         .init();
-    info!("Starting unpatched server...");
     let pool = create_datase().await;
 
     let web_page = ServeDir::new(WEBPAGE.path().join("target").join("site"))
@@ -102,7 +101,7 @@ async fn main() {
         );
 
     let addr: SocketAddr = format!("{}:{}", args.bind, args.port).parse().unwrap();
-    debug!("listening on {}", addr);
+    info!("listening on http://{addr}/");
     axum::Server::bind(&addr)
         .serve(app.into_make_service_with_connect_info::<SocketAddr>())
         .await
@@ -216,7 +215,7 @@ async fn agents_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<Vec<Age
         .await
     {
         Ok(d) => d,
-        Err(_) => return (StatusCode::NOT_FOUND, Json(Vec::new())),
+        Err(_) => return (StatusCode::OK, Json(Vec::new())),
     };
 
     let mut agents_vec: Vec<AgentData> = vec![];

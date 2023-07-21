@@ -32,7 +32,7 @@ use tracing::{debug, error, info};
 use tracing_subscriber::{fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter};
 use uuid::Uuid;
 
-static WEBPAGE: Dir = include_dir!("$CARGO_MANIFEST_DIR/target/page");
+static WEBPAGE: Dir = include_dir!("$CARGO_MANIFEST_DIR/target/site");
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -84,7 +84,7 @@ async fn main() {
     info!("Starting unpatched server...");
     let pool = create_datase().await;
 
-    let web_page = ServeDir::new(WEBPAGE.path().join("target").join("page"))
+    let web_page = ServeDir::new(WEBPAGE.path().join("target").join("site"))
         .append_index_html_on_directories(true);
 
     // build our application with some routes

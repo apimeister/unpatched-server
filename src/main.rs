@@ -5,13 +5,14 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Path,
     },
-    http::StatusCode,
-    response::IntoResponse,
+    http::{StatusCode, header},
+    response::{IntoResponse, Html},
     routing::get,
     Json, Router,
 };
 use clap::Parser;
 use futures::{sink::SinkExt, stream::StreamExt};
+use headers::{HeaderValue, HeaderMap};
 use include_dir::{include_dir, Dir};
 use serde::{Deserialize, Serialize};
 use sqlx::{query, sqlite::SqlitePool, Row};
@@ -23,7 +24,7 @@ use tower_http::{
     services::ServeDir,
     trace::{DefaultMakeSpan, TraceLayer},
 };
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::{
     fmt::{self},
     layer::SubscriberExt,
@@ -97,6 +98,9 @@ async fn main() {
             "/api/v1/hosts",
             get(host::get_hosts_api).with_state(pool.clone()),
         )
+        .route("/api", get(api_ui))
+        .route("/api/v1", get(api_ui))
+        .route("/api/api.yaml", get(api_def))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
@@ -272,4 +276,44 @@ fn new_id() -> String {
     let id = Uuid::new_v4();
     let string_id = format!("{}", id.as_hyphenated());
     string_id
+}
+
+pub async fn api_ui() -> impl IntoResponse {
+    let html = r#"<!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <link rel="shortcut icon" type="image/png" href="/dtz.png" />
+      <title>DTZ - SwaggerUI</title>
+      <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.0.0-alpha.4/swagger-ui.css" />
+    </head>
+    <body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5.0.0-alpha.4/swagger-ui-bundle.js" crossorigin></script>
+    <script>
+      window.onload = () => {
+        window.ui = SwaggerUIBundle({
+          url: '/api/api.yaml',
+          dom_id: '#swagger-ui',
+        });
+      };
+    </script>
+    </body>
+    </html>"#;
+    (StatusCode::OK, Html(html))
+}
+
+pub async fn api_def() -> impl IntoResponse {
+    let spec = std::fs::read_to_string("api.yaml").unwrap();
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::ACCESS_CONTROL_ALLOW_ORIGIN,
+        HeaderValue::from_static("*"),
+    );
+    headers.insert(
+        header::ACCESS_CONTROL_ALLOW_METHODS,
+        HeaderValue::from_static("GET"),
+    );
+    (StatusCode::OK, headers, spec)
 }

@@ -37,6 +37,7 @@ use uuid::Uuid;
 mod db;
 mod host;
 mod script;
+mod schedule;
 
 static WEBPAGE: Dir = include_dir!("$CARGO_MANIFEST_DIR/target/site");
 
@@ -97,6 +98,10 @@ async fn main() {
         .route(
             "/api/v1/hosts",
             get(host::get_hosts_api).with_state(pool.clone()),
+        )
+        .route(
+            "/api/v1/schedules",
+            get(schedule::get_schedules_api).with_state(pool.clone()),
         )
         .route("/api", get(api_ui))
         .route("/api/v1", get(api_ui))
@@ -284,8 +289,8 @@ pub async fn api_ui() -> impl IntoResponse {
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <link rel="shortcut icon" type="image/png" href="/dtz.png" />
-      <title>DTZ - SwaggerUI</title>
+      <link rel="shortcut icon" type="image/png" href="/unpatched.png" />
+      <title>Unpatched Server - SwaggerUI</title>
       <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.0.0-alpha.4/swagger-ui.css" />
     </head>
     <body>

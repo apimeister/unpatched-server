@@ -11,7 +11,6 @@ pub struct Schedule {
 }
 
 impl Schedule {
-
     /// Insert schedule into Scheduling table
     ///
     /// | Name | Type | Comment
@@ -24,18 +23,25 @@ impl Schedule {
     // FIXME: write test and remove dead_code
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
         query(r#"INSERT INTO scripts( id, script_id, attributes, cron ) VALUES ( ?, ?, ?, ? )"#)
-        .bind(self.id)
-        .bind(self.script_id)
-        .bind(self.attributes)
-        .bind(self.cron)
-        .execute(&mut *connection).await.unwrap()
+            .bind(self.id)
+            .bind(self.script_id)
+            .bind(self.attributes)
+            .bind(self.cron)
+            .execute(&mut *connection)
+            .await
+            .unwrap()
     }
 }
 
 /// API to get all scripts
-pub async fn get_schedules_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<Vec<Schedule>>) {
+pub async fn get_schedules_api(
+    State(pool): State<SqlitePool>,
+) -> (StatusCode, Json<Vec<Schedule>>) {
     let mut conn = pool.acquire().await.unwrap();
-    let schedules = match query("SELECT * FROM scheduling").fetch_all(&mut *conn).await {
+    let schedules = match query("SELECT * FROM scheduling")
+        .fetch_all(&mut *conn)
+        .await
+    {
         Ok(d) => d,
         Err(_) => return (StatusCode::NOT_FOUND, Json(Vec::new())),
     };
@@ -47,7 +53,7 @@ pub async fn get_schedules_api(State(pool): State<SqlitePool>) -> (StatusCode, J
             id: s.get::<String, _>("id"),
             script_id: s.get::<String, _>("script_id"),
             attributes: s.get::<String, _>("attributes"),
-            cron: s.get::<String, _>("cron")
+            cron: s.get::<String, _>("cron"),
         };
         schedule_vec.push(schedule);
     }

@@ -14,13 +14,8 @@ use clap::Parser;
 use futures::{sink::SinkExt, stream::StreamExt};
 use include_dir::{include_dir, Dir};
 use serde::{Deserialize, Serialize};
-use sqlx::{
-    query,
-    sqlite::{SqliteConnectOptions, SqlitePool},
-    Row,
-};
+use sqlx::{query, sqlite::SqlitePool, Row};
 use std::net::SocketAddr;
-use std::str::FromStr;
 use std::time::Duration;
 use std::vec;
 use systemctl::Unit;
@@ -29,8 +24,18 @@ use tower_http::{
     trace::{DefaultMakeSpan, TraceLayer},
 };
 use tracing::{debug, error, info};
-use tracing_subscriber::{fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{
+    fmt::{self},
+    layer::SubscriberExt,
+    registry,
+    util::SubscriberInitExt,
+    EnvFilter,
+};
 use uuid::Uuid;
+
+mod db;
+mod host;
+mod script;
 
 static WEBPAGE: Dir = include_dir!("$CARGO_MANIFEST_DIR/target/site");
 
@@ -73,6 +78,7 @@ enum AllowedFields {
 
 const UPDATE_RATE: Duration = Duration::new(5, 0);
 const SQLITE_DB: &str = "sqlite:monitor_server_internal.sqlite";
+// const SCRIPT_FOLDER: &str = "scripts";
 
 #[tokio::main]
 async fn main() {
@@ -81,7 +87,10 @@ async fn main() {
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .with(fmt::layer())
         .init();
-    let pool = create_datase().await;
+    // fs::create_dir_all(SCRIPT_FOLDER)
+    //     .expect("Could not create scripts dir, are file permissions correctly set?");
+    // let _ = parse_scipts(SCRIPT_FOLDER);
+    let pool = db::create_datase().await;
 
     let web_page = ServeDir::new(WEBPAGE.path().join("target").join("site"))
         .append_index_html_on_directories(true);
@@ -94,7 +103,15 @@ async fn main() {
             "/api/v1/agents/:id",
             get(single_agent_api).with_state(pool.clone()),
         )
-        .route("/api/v1/agents", get(agents_api).with_state(pool))
+        .route("/api/v1/agents", get(agents_api).with_state(pool.clone()))
+        .route(
+            "/api/v1/scripts",
+            get(script::get_scripts_api).with_state(pool.clone()),
+        )
+        .route(
+            "/api/v1/hosts",
+            get(host::get_hosts_api).with_state(pool.clone()),
+        )
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
@@ -258,33 +275,43 @@ async fn single_agent_api(
     (StatusCode::OK, Json(single_agent))
 }
 
-/// create database
-/// sqlite::memory: - Open an in-memory database.
-/// sqlite:data.db - Open the file data.db in the current directory.
-/// sqlite://data.db - Open the file data.db in the current directory.
-/// sqlite:///data.db - Open the file data.db from the root (/) directory.
-/// sqlite://data.db?mode=ro - Open the file data.db for read-only access.
-async fn create_datase() -> SqlitePool {
-    let connection_options = SqliteConnectOptions::from_str(SQLITE_DB)
-        .unwrap()
-        .create_if_missing(true);
-    let pool = SqlitePool::connect_with(connection_options).await.unwrap();
-    {
-        let mut conn = pool.acquire().await.unwrap();
-        let _create_table = query(
-            r#"CREATE TABLE IF NOT EXISTS 
-            data(
-                id VARCHAR(36) PRIMARY KEY NOT NULL,
-                name VARCHAR(255),
-                uptime INT,
-                os_release VARCHAR(255),
-                memory VARCHAR(255),
-                units VARCHAR(255)
-            )"#,
-        )
-        .execute(&mut *conn)
-        .await
-        .unwrap();
-    }
-    pool
+// fn parse_scipts(path: &str) -> std::io::Result<Vec<Script>> {
+//     let script_vec: Vec<Script> = Vec::new();
+//     for folder in list_folders(path)? {
+//         let zz = list_folders(folder)?;
+//         for z in &zz {
+//             if z.ends_with("config.yaml") {
+//                 let f = std::fs::read_to_string(z)?;
+//                 let script: Script = match serde_yaml::from_str(f.as_str()) {
+//                     Ok(s) => s,
+//                     Err(e) => {
+//                         return Err(std::io::Error::new(
+//                             std::io::ErrorKind::InvalidData,
+//                             format!("stderr was not valid utf-8: {e}"),
+//                         ))
+//                     }
+//                 };
+//                 debug!("{:?}", script);
+//             }
+//         }
+
+//         debug!("{:?}", zz);
+//     }
+//     Ok(script_vec)
+// }
+
+// fn list_folders<P: AsRef<std::path::Path> + std::fmt::Debug>(
+//     path: P,
+// ) -> std::io::Result<Vec<std::path::PathBuf>> {
+//     debug!("folders: {:?}", path);
+//     let entries = fs::read_dir(path)?
+//         .map(|res| res.map(|e| e.path()))
+//         .collect::<Result<Vec<_>, std::io::Error>>()?;
+//     Ok(entries)
+// }
+
+fn new_id() -> String {
+    let id = Uuid::new_v4();
+    let string_id = format!("{}", id.as_hyphenated());
+    string_id
 }

@@ -147,21 +147,20 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
 
         loop {
             let _ping = sink.send(Message::Ping("Hello, Client!".into())).await;
-            // let schedules =
-            //     schedule::get_schedules_from_db(sender_pool.acquire().await.unwrap()).await;
-            // for schedule in schedules {
-            //     debug!(" sending schedule: {:?}", schedule);
-            //     let json_schedule = match serde_json::to_string(&schedule) {
-            //         Ok(j) => j,
-            //         Err(e) => {
-            //             error!("Could not transform schedule {} to json\n{e}", schedule.id);
-            //             continue;
-            //         }
-            //     };
-            //     let _sent_schedule = sink
-            //         .send(Message::Text(format!("schedule:{json_schedule}")))
-            //         .await;
-            // }
+            let scripts = script::get_scripts_from_db(sender_pool.acquire().await.unwrap()).await;
+            for script in scripts {
+                debug!(" sending script: {:?}", script);
+                let json_script = match serde_json::to_string(&script) {
+                    Ok(j) => j,
+                    Err(e) => {
+                        error!("Could not transform script {} to json\n{e}", script.id);
+                        continue;
+                    }
+                };
+                let _sent_script = sink
+                    .send(Message::Text(format!("script:{json_script}")))
+                    .await;
+            }
             tokio::time::sleep(UPDATE_RATE).await;
         }
     });

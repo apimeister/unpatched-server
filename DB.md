@@ -17,6 +17,7 @@
 | version | varchar(5) |
 | output_regex | text |
 | labels | json |
+| timeout | text
 | script_content | text |
 
 ### hosts

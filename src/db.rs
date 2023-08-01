@@ -35,6 +35,8 @@ pub async fn create_datase() -> SqlitePool {
         .unwrap();
     if script_count.get::<i32, _>("id_count") == 0 {
         init_scripts_table(&pool).await
+    } else {
+        debug!("DB init: script table has scripts, samples not loaded");
     }
 
     let schedule_count = query("SELECT count(id) as id_count FROM scheduling")
@@ -46,6 +48,8 @@ pub async fn create_datase() -> SqlitePool {
             Some(_) => info!("DB init: sample schedules loaded"),
             None => warn!("DB init: Could not initialize sample schedules, starting with empty schedule table")
         }
+    } else {
+        debug!("DB init: scheduling table has schedules, samples not loaded");
     }
     pool
 }
@@ -89,6 +93,7 @@ async fn create_data_table(mut connection: PoolConnection<Sqlite>) -> Result<(),
 /// | id | TEXT | uuid
 /// | alias | TEXT | host alias (name)
 /// | attributes | TEXT | host labels
+/// | last_pong | TEXT | last checkin from agent
 async fn create_hosts_table(mut connection: PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
     let res = query(
         r#"CREATE TABLE IF NOT EXISTS 
@@ -118,6 +123,7 @@ async fn create_hosts_table(mut connection: PoolConnection<Sqlite>) -> Result<()
 /// | version | TEXT |
 /// | output_regex | TEXT | regex for result parsing
 /// | labels | TEXT | script labels
+/// | timeout | TEXT | timeout (1s, 5m, 3h etc.)
 /// | script_content | TEXT | original script
 async fn create_scripts_table(mut connection: PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
     let res = query(
@@ -128,6 +134,7 @@ async fn create_scripts_table(mut connection: PoolConnection<Sqlite>) -> Result<
             version TEXT,
             output_regex TEXT,
             labels TEXT,
+            timeout TEXT,
             script_content TEXT
         )"#,
     )
@@ -213,6 +220,7 @@ async fn init_scripts_table(pool: &Pool<Sqlite>) {
         version: "0.0.1".into(),
         output_regex: ".*".into(),
         labels: "sample,sample2".into(),
+        timeout: "5s".into(),
         script_content: r#"uptime -p"#.into(),
     };
     let os_version = Script {
@@ -221,6 +229,7 @@ async fn init_scripts_table(pool: &Pool<Sqlite>) {
         version: "0.0.1".into(),
         output_regex: ".*".into(),
         labels: "sample,sample2".into(),
+        timeout: "5s".into(),
         script_content: r#"cat /etc/os-release"#.into(),
     };
     let uptime_res = uptime.insert_into_db(pool.acquire().await.unwrap()).await;

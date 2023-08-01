@@ -9,17 +9,11 @@ pub struct Script {
     pub version: String,
     pub output_regex: String,
     pub labels: String,
+    pub timeout: String,
     pub script_content: String,
 }
 
 impl Script {
-    //    pub fn new_with_id() -> Self {
-    //         Script {
-    //             id: new_id(),
-    //             ..Default::default()
-    //         }
-    //     }
-
     /// Insert Script into scripts table
     ///
     /// | Name | Type | Comment
@@ -29,14 +23,16 @@ impl Script {
     /// | version | TEXT |
     /// | output_regex | TEXT | regex for result parsing
     /// | labels | TEXT | script labels
+    /// | timeout | TEXT | timeout (1s, 5m, 3h etc.)
     /// | script_content | TEXT | original script
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        query(r#"INSERT INTO scripts( id, name, version, output_regex, labels, script_content ) VALUES ( ?, ?, ?, ?, ?, ? )"#)
+        query(r#"INSERT INTO scripts( id, name, version, output_regex, labels, timeout, script_content ) VALUES ( ?, ?, ?, ?, ?, ?, ? )"#)
         .bind(self.id)
         .bind(self.name)
         .bind(self.version)
         .bind(self.output_regex)
         .bind(self.labels)
+        .bind(self.timeout)
         .bind(self.script_content)
         .execute(&mut *connection).await.unwrap()
     }
@@ -70,6 +66,7 @@ pub async fn get_scripts_from_db(mut connection: PoolConnection<Sqlite>) -> Vec<
             version: s.get::<String, _>("version"),
             output_regex: s.get::<String, _>("output_regex"),
             labels: s.get::<String, _>("labels"),
+            timeout: s.get::<String, _>("timeout"),
             script_content: s.get::<String, _>("script_content"),
         };
         script_vec.push(script);

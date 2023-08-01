@@ -78,7 +78,6 @@ enum AllowedFields {
 
 const UPDATE_RATE: Duration = Duration::new(5, 0);
 const SQLITE_DB: &str = "sqlite:monitor_server_internal.sqlite";
-// const SCRIPT_FOLDER: &str = "scripts";
 
 #[tokio::main]
 async fn main() {
@@ -87,9 +86,6 @@ async fn main() {
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .with(fmt::layer())
         .init();
-    // fs::create_dir_all(SCRIPT_FOLDER)
-    //     .expect("Could not create scripts dir, are file permissions correctly set?");
-    // let _ = parse_scipts(SCRIPT_FOLDER);
     let pool = db::create_datase().await;
 
     let web_page = ServeDir::new(WEBPAGE.path().join("target").join("site"))
@@ -274,41 +270,6 @@ async fn single_agent_api(
     };
     (StatusCode::OK, Json(single_agent))
 }
-
-// fn parse_scipts(path: &str) -> std::io::Result<Vec<Script>> {
-//     let script_vec: Vec<Script> = Vec::new();
-//     for folder in list_folders(path)? {
-//         let zz = list_folders(folder)?;
-//         for z in &zz {
-//             if z.ends_with("config.yaml") {
-//                 let f = std::fs::read_to_string(z)?;
-//                 let script: Script = match serde_yaml::from_str(f.as_str()) {
-//                     Ok(s) => s,
-//                     Err(e) => {
-//                         return Err(std::io::Error::new(
-//                             std::io::ErrorKind::InvalidData,
-//                             format!("stderr was not valid utf-8: {e}"),
-//                         ))
-//                     }
-//                 };
-//                 debug!("{:?}", script);
-//             }
-//         }
-
-//         debug!("{:?}", zz);
-//     }
-//     Ok(script_vec)
-// }
-
-// fn list_folders<P: AsRef<std::path::Path> + std::fmt::Debug>(
-//     path: P,
-// ) -> std::io::Result<Vec<std::path::PathBuf>> {
-//     debug!("folders: {:?}", path);
-//     let entries = fs::read_dir(path)?
-//         .map(|res| res.map(|e| e.path()))
-//         .collect::<Result<Vec<_>, std::io::Error>>()?;
-//     Ok(entries)
-// }
 
 fn new_id() -> String {
     let id = Uuid::new_v4();

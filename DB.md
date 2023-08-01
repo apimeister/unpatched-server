@@ -41,6 +41,7 @@
 <!-- run on host with attribute (label) xxx -->
 | attributes | json |
 | cron | text |
+| active | bool |
 
 ### metrics
 

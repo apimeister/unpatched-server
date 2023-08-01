@@ -141,19 +141,34 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     // ##################
     // ALL THE SEND STUFF
     // ##################
-
+    let sender_pool = pool.clone();
     let _sender_handle = tokio::spawn(async move {
         let mut sink = sender;
 
         loop {
             let _ping = sink.send(Message::Ping("Hello, Client!".into())).await;
+            // let schedules =
+            //     schedule::get_schedules_from_db(sender_pool.acquire().await.unwrap()).await;
+            // for schedule in schedules {
+            //     debug!(" sending schedule: {:?}", schedule);
+            //     let json_schedule = match serde_json::to_string(&schedule) {
+            //         Ok(j) => j,
+            //         Err(e) => {
+            //             error!("Could not transform schedule {} to json\n{e}", schedule.id);
+            //             continue;
+            //         }
+            //     };
+            //     let _sent_schedule = sink
+            //         .send(Message::Text(format!("schedule:{json_schedule}")))
+            //         .await;
+            // }
             tokio::time::sleep(UPDATE_RATE).await;
         }
     });
     // #####################
     // ALL THE RECEIVE STUFF
     // #####################
-
+    let receiver_pool = pool.clone();
     let recv_handle = tokio::spawn(async move {
         let mut id: Option<String> = None;
         while let Some(Ok(msg)) = receiver.next().await {
@@ -174,7 +189,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                         debug!("Update agent as alive (hosts table -> last pong)!");
                         let _ = query(r#"UPDATE hosts SET last_pong = datetime() WHERE id = ?"#)
                             .bind(uuid)
-                            .execute(&mut *pool.acquire().await.unwrap())
+                            .execute(&mut *receiver_pool.acquire().await.unwrap())
                             .await
                             .unwrap();
                     }
@@ -187,7 +202,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                                 id = Some(v.into());
                                 let id_res = query(r#"INSERT INTO hosts(id) VALUES (?)"#)
                                     .bind(v)
-                                    .execute(&mut *pool.acquire().await.unwrap())
+                                    .execute(&mut *receiver_pool.acquire().await.unwrap())
                                     .await;
                                 // FIXME: This should be some real error handling
                                 if id_res.is_err() {
@@ -212,7 +227,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                         let _ = query(&stmt)
                             .bind(data)
                             .bind(uuid)
-                            .execute(&mut *pool.acquire().await.unwrap())
+                            .execute(&mut *receiver_pool.acquire().await.unwrap())
                             .await
                             .unwrap();
                     }

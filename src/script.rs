@@ -44,10 +44,21 @@ impl Script {
 
 /// API to get all scripts
 pub async fn get_scripts_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<Vec<Script>>) {
-    let mut conn = pool.acquire().await.unwrap();
-    let scripts = match query("SELECT * FROM scripts").fetch_all(&mut *conn).await {
+    let script_vec = get_scripts_from_db(pool.acquire().await.unwrap()).await;
+    if script_vec.is_empty() {
+        (StatusCode::NOT_FOUND, Json(script_vec))
+    } else {
+        (StatusCode::OK, Json(script_vec))
+    }
+}
+
+pub async fn get_scripts_from_db(mut connection: PoolConnection<Sqlite>) -> Vec<Script> {
+    let scripts = match query("SELECT * FROM scripts")
+        .fetch_all(&mut *connection)
+        .await
+    {
         Ok(d) => d,
-        Err(_) => return (StatusCode::NOT_FOUND, Json(Vec::new())),
+        Err(_) => return Vec::new(),
     };
 
     let mut script_vec: Vec<Script> = Vec::new();
@@ -63,6 +74,19 @@ pub async fn get_scripts_api(State(pool): State<SqlitePool>) -> (StatusCode, Jso
         };
         script_vec.push(script);
     }
+    script_vec
+}
 
-    (StatusCode::OK, Json(script_vec))
+pub async fn get_script_id_by_name_from_db(
+    name: String,
+    mut connection: PoolConnection<Sqlite>,
+) -> Option<String> {
+    match query("SELECT id FROM scripts WHERE name = ?")
+        .bind(name)
+        .fetch_one(&mut *connection)
+        .await
+    {
+        Ok(s) => Some(s.get::<String, _>("id")),
+        Err(_) => None,
+    }
 }

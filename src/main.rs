@@ -65,17 +65,6 @@ struct AgentDataMemory {
     total_mem: u64,
 }
 
-enum AllowedFields {
-    Id(String),
-    Alias(String),
-    OsRelease(String),
-    // FIXME: uptime could be f32 or u32 to have a real check
-    Uptime(String),
-    Memory(AgentDataMemory),
-    Units(Vec<Unit>),
-    Discard,
-}
-
 const UPDATE_RATE: Duration = Duration::new(5, 0);
 const SQLITE_DB: &str = "sqlite:monitor_server_internal.sqlite";
 
@@ -140,81 +129,89 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     // split websocket stream so we can have both directions working independently
     let (sender, mut receiver) = socket.split();
 
+    // ##################
+    // ALL THE SEND STUFF
+    // ##################
+
     let _sender_handle = tokio::spawn(async move {
         let mut sink = sender;
-        let _ping = sink.send(Message::Ping("Hello, Client!".into())).await;
 
-        // ALL THE SEND STUFF
         loop {
             let _ping = sink.send(Message::Ping("Hello, Client!".into())).await;
             tokio::time::sleep(UPDATE_RATE).await;
         }
     });
+    // #####################
+    // ALL THE RECEIVE STUFF
+    // #####################
 
     let recv_handle = tokio::spawn(async move {
-        // ALL THE RECEIVE STUFF
-        let mut id: Option<AllowedFields> = None;
+        let mut id: Option<String> = None;
         while let Some(Ok(msg)) = receiver.next().await {
-            // cnt += 1;
-            let mut data = AllowedFields::Discard;
             match msg {
                 Message::Close(_) => break,
+                // Ping Message is only send on first connection by agent
                 Message::Ping(v) => {
                     let alias = std::str::from_utf8(&v).unwrap_or("");
                     debug!("Received a Ping!");
                     info!("Client {alias} Connected from {who}");
                 }
-                Message::Pong(_) => debug!("Received a Pong!"),
+                // Pong Message is sent by client on any Ping from server (alive status)
+                Message::Pong(_v) => {
+                    debug!("Received a Pong!");
+
+                    // without ID, skip and wait for next update cycle
+                    if let Some(uuid) = &id {
+                        debug!("Update agent as alive (hosts table -> last pong)!");
+                        let _ = query(r#"UPDATE hosts SET last_pong = datetime() WHERE id = ?"#)
+                            .bind(uuid)
+                            .execute(&mut *pool.acquire().await.unwrap())
+                            .await
+                            .unwrap();
+                    }
+                }
                 Message::Text(t) => {
-                    let (k, v) = t.split_once(':').unwrap();
-                    data = match k {
-                        "uuid" => {
-                            id = Some(AllowedFields::Id(v.to_string()));
-                            let mut conn = pool.acquire().await.unwrap();
-                            let id_res = query(r#"INSERT INTO data( id, name, uptime, os_release, memory, units ) VALUES ( ?, "", 0, "", "", "" )"#).bind(v).execute(&mut *conn).await;
-                            // TO-DO: This should be some real error handling
-                            if id_res.is_err() {
-                                debug!("Agent with Id {v} already known")
+                    let (k, v) = t.split_once(':').unwrap_or(("", ""));
+                    let data = match k {
+                        "id" => {
+                            if id.is_none() {
+                                id = Some(v.into());
+                                let id_res = query(r#"INSERT INTO hosts(id) VALUES (?)"#)
+                                    .bind(v)
+                                    .execute(&mut *pool.acquire().await.unwrap())
+                                    .await;
+                                // FIXME: This should be some real error handling
+                                if id_res.is_err() {
+                                    debug!("Agent with id {v} already known")
+                                }
                             }
-                            AllowedFields::Id(v.to_string())
+                            continue;
                         }
-                        "alias" => AllowedFields::Alias(v.to_string()),
-                        "os" => AllowedFields::OsRelease(v.to_string()),
-                        "uptime" => {
-                            let (time, _) = v.split_once('.').unwrap_or((v, v));
-                            AllowedFields::Uptime(time.to_string())
+                        "alias" => v.to_string(),
+                        "attributes" => v.to_string(),
+                        "script" => v.to_string(),
+                        // ignore all unknown fields
+                        x => {
+                            warn!("{x} is unsupported!");
+                            continue;
                         }
-                        "memory" => AllowedFields::Memory(serde_json::from_str(v).unwrap()),
-                        "units" => AllowedFields::Units(serde_json::from_str(v).unwrap()),
-                        _ => AllowedFields::Discard,
                     };
+                    // without ID, skip and wait for next update cycle
+                    if let Some(uuid) = &id {
+                        debug!("Received some data for {k}: {data}");
+                        let stmt = format!("UPDATE hosts SET {k} = ? WHERE id = ?");
+                        let _ = query(&stmt)
+                            .bind(data)
+                            .bind(uuid)
+                            .execute(&mut *pool.acquire().await.unwrap())
+                            .await
+                            .unwrap();
+                    }
                 }
                 Message::Binary(_) => error!("Binary is unsupported!"),
             };
             // FIXME: implement something with this who
             let _who = who;
-
-            // without ID, skip and wait for next update cycle
-            if let Some(AllowedFields::Id(agent_id)) = &id {
-                let mut conn = pool.acquire().await.unwrap();
-                let (field, value) = match data {
-                    AllowedFields::Alias(v) => ("name", v),
-                    AllowedFields::Uptime(v) => ("uptime", v),
-                    AllowedFields::OsRelease(v) => ("os_release", v),
-                    AllowedFields::Units(v) => ("units", serde_json::to_string(&v).unwrap()),
-                    AllowedFields::Memory(v) => ("memory", serde_json::to_string(&v).unwrap()),
-                    _ => continue,
-                };
-
-                debug!("Received some data for {field}: {value}");
-
-                let _ = query(format!(r#"UPDATE data SET {field} = ? WHERE id = ?"#).as_str())
-                    .bind(value)
-                    .bind(agent_id)
-                    .execute(&mut *conn)
-                    .await
-                    .unwrap();
-            }
         }
     });
 

@@ -7,6 +7,7 @@ pub struct Host {
     pub id: String,
     pub alias: String,
     pub attributes: String,
+    pub last_pong: String,
 }
 
 impl Host {
@@ -20,7 +21,7 @@ impl Host {
     #[allow(dead_code)]
     // FIXME: write test and remove dead_code
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        query(r#"INSERT INTO hosts( id, alias, attributes ) VALUES ( ?, ?, ? )"#)
+        query(r#"INSERT INTO hosts( id, alias, attributes, last_pong ) VALUES ( ?, ?, ?, datetime() )"#)
             .bind(self.id)
             .bind(self.alias)
             .bind(self.attributes)
@@ -45,6 +46,7 @@ pub async fn get_hosts_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<
             id: s.get::<String, _>("id"),
             alias: s.get::<String, _>("alias"),
             attributes: s.get::<String, _>("attributes"),
+            last_pong: s.get::<String, _>("last_pong"),
         };
         host_vec.push(host);
     }

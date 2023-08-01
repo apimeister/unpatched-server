@@ -78,7 +78,8 @@ async fn create_hosts_table(mut connection: PoolConnection<Sqlite>) -> Result<()
         hosts(
             id TEXT PRIMARY KEY NOT NULL,
             alias TEXT,
-            attributes TEXT
+            attributes TEXT,
+            last_pong TEXT
         )"#,
     )
     .execute(&mut *connection)

@@ -24,6 +24,7 @@
 | id | varchar(36) | uuid
 | alias | text |
 | attributes | json |
+| last_pong | bool
 
 ### executions
 

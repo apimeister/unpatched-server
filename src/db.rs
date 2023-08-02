@@ -22,7 +22,6 @@ pub async fn create_datase(connection: &str) -> SqlitePool {
         .unwrap()
         .create_if_missing(true);
     let pool = SqlitePool::connect_with(connection_options).await.unwrap();
-    let _t = create_data_table(pool.acquire().await.unwrap()).await;
     let _t = create_hosts_table(pool.acquire().await.unwrap()).await;
     let _t = create_scripts_table(pool.acquire().await.unwrap()).await;
     let _t = create_executions_table(pool.acquire().await.unwrap()).await;
@@ -51,38 +50,6 @@ pub async fn create_datase(connection: &str) -> SqlitePool {
         debug!("DB init: scheduling table has schedules, samples not loaded");
     }
     pool
-}
-
-/// (deprecated) Create Data Table in SQLite Database
-///
-/// | Name | Type | Comment
-/// :--- | :--- | :---
-/// id | TEXT | uuid
-/// | name | TEXT |
-/// | uptime | INTEGER |
-/// | os_release | TEXT |
-/// | memory | TEXT |
-/// | units | TEXT |
-async fn create_data_table(mut connection: PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
-    let res = query(
-        r#"CREATE TABLE IF NOT EXISTS 
-            data(
-                id TEXT PRIMARY KEY NOT NULL,
-                name TEXT,
-                uptime INTEGER,
-                os_release TEXT,
-                memory TEXT,
-                units TEXT
-            )"#,
-    )
-    .execute(&mut *connection)
-    .await?;
-    if res.rows_affected() > 0 {
-        info!("DB init: created data table");
-    } else {
-        debug!("DB init: data table already present");
-    };
-    Ok(())
 }
 
 /// Create hosts table in SQLite database

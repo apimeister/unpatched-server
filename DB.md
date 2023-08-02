@@ -2,14 +2,6 @@
 
 ## table structures
 
-### data
-
-| id | VARCHAR(36) | uuid
-| name | VARCHAR(255) |
-| uptime | INT |
-| os_release | text |
-| memory | json |
-
 ### scripts
 
 | id | varchar(36) | uuid

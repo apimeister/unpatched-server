@@ -59,3 +59,27 @@ pub async fn get_hosts_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<
 
     (StatusCode::OK, Json(host_vec))
 }
+
+// async fn single_agent_api(
+//     Path(id): Path<Uuid>,
+//     State(pool): State<SqlitePool>,
+// ) -> (StatusCode, Json<AgentData>) {
+//     let mut conn = pool.acquire().await.unwrap();
+//     let show_data = match query("SELECT * FROM data WHERE id = ?")
+//         .bind(id.to_string())
+//         .fetch_one(&mut *conn)
+//         .await
+//     {
+//         Ok(d) => d,
+//         Err(_) => return (StatusCode::NOT_FOUND, Json(AgentData::default())),
+//     };
+//     let single_agent = AgentData {
+//         id: show_data.get::<String, _>("id"),
+//         alias: show_data.get::<String, _>("name"),
+//         uptime: show_data.get::<i64, _>("uptime"),
+//         os_release: show_data.get::<String, _>("os_release"),
+//         memory: serde_json::from_str(show_data.get::<String, _>("memory").as_str()).unwrap(),
+//         units: serde_json::from_str(show_data.get::<String, _>("units").as_str()).unwrap(),
+//     };
+//     (StatusCode::OK, Json(single_agent))
+// }

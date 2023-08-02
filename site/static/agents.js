@@ -7,13 +7,13 @@ export default {
     setup() {
         const agents = ref(null);
         watchEffect(async () => { 
-            agents.value = await (await fetch('/api/v1/agents')).json();
+            agents.value = await (await fetch('/api/v1/hosts')).json();
         })
         const agent_detail = ref(null);
         let currentId = ref(null)
         watchEffect(async () => { 
             if (currentId.value) {
-                agent_detail.value = await (await fetch(`/api/v1/agents/${currentId.value}`)).json();
+                agent_detail.value = await (await fetch(`/api/v1/hosts/${currentId.value}`)).json();
             }
              })
 

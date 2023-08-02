@@ -4,7 +4,6 @@ use crate::{
     new_id,
     schedule::Schedule,
     script::{get_script_id_by_name_from_db, Script},
-    SQLITE_DB,
 };
 use sqlx::{
     pool::PoolConnection, query, sqlite::SqliteConnectOptions, Pool, Row, Sqlite, SqlitePool,
@@ -12,14 +11,14 @@ use sqlx::{
 use tracing::{debug, info, warn};
 
 /// create database
-/// sqlite::memory: - Open an in-memory database.
+/// sqlite::memory: - Open an in-memory database
 /// sqlite:data.db - Open the file data.db in the current directory.
 /// sqlite://data.db - Open the file data.db in the current directory.
 /// sqlite:///data.db - Open the file data.db from the root (/) directory.
 /// sqlite://data.db?mode=ro - Open the file data.db for read-only access.
 /// types: https://www.sqlite.org/datatype3.html
-pub async fn create_datase() -> SqlitePool {
-    let connection_options = SqliteConnectOptions::from_str(SQLITE_DB)
+pub async fn create_datase(connection: &str) -> SqlitePool {
+    let connection_options = SqliteConnectOptions::from_str(connection)
         .unwrap()
         .create_if_missing(true);
     let pool = SqlitePool::connect_with(connection_options).await.unwrap();

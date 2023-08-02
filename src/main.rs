@@ -32,7 +32,6 @@ use tracing_subscriber::{
     EnvFilter,
 };
 use uuid::Uuid;
-
 mod db;
 mod host;
 mod schedule;
@@ -77,7 +76,7 @@ async fn main() {
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .with(fmt::layer())
         .init();
-    let pool = db::create_datase().await;
+    let pool = db::create_datase(SQLITE_DB).await;
 
     let web_page = ServeDir::new(WEBPAGE.path().join("target").join("site"))
         .append_index_html_on_directories(true);

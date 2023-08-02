@@ -92,6 +92,7 @@ async fn create_data_table(mut connection: PoolConnection<Sqlite>) -> Result<(),
 /// | id | TEXT | uuid
 /// | alias | TEXT | host alias (name)
 /// | attributes | TEXT | host labels
+/// | ip | TEXT | host ip:port
 /// | last_pong | TEXT | last checkin from agent
 async fn create_hosts_table(mut connection: PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
     let res = query(
@@ -100,6 +101,7 @@ async fn create_hosts_table(mut connection: PoolConnection<Sqlite>) -> Result<()
             id TEXT PRIMARY KEY NOT NULL,
             alias TEXT,
             attributes TEXT,
+            ip TEXT,
             last_pong TEXT
         )"#,
     )

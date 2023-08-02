@@ -134,6 +134,7 @@ async fn ws_handler(
 
 /// Actual websocket statemachine (one will be spawned per connection)
 async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
+    let mut id: Option<String> = None;
     // split websocket stream so we can have both directions working independently
     let (sender, mut receiver) = socket.split();
 
@@ -168,7 +169,6 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     // #####################
     let receiver_pool = pool.clone();
     let recv_handle = tokio::spawn(async move {
-        let mut id: Option<String> = None;
         while let Some(Ok(msg)) = receiver.next().await {
             match msg {
                 Message::Close(_) => break,
@@ -184,7 +184,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
 
                     // without ID, skip and wait for next update cycle
                     if let Some(uuid) = &id {
-                        debug!("Update agent as alive (hosts table -> last pong)!");
+                        debug!("Update agent {uuid} as alive (hosts table -> last pong)!");
                         let _ = query(r#"UPDATE hosts SET last_pong = datetime() WHERE id = ?"#)
                             .bind(uuid)
                             .execute(&mut *receiver_pool.acquire().await.unwrap())
@@ -198,8 +198,9 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                         "id" => {
                             if id.is_none() {
                                 id = Some(v.into());
-                                let id_res = query(r#"INSERT INTO hosts(id) VALUES (?)"#)
+                                let id_res = query(r#"INSERT INTO hosts(id, ip) VALUES (?, ?)"#)
                                     .bind(v)
+                                    .bind(who.to_string())
                                     .execute(&mut *receiver_pool.acquire().await.unwrap())
                                     .await;
                                 // FIXME: This should be some real error handling

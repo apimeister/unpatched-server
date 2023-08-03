@@ -216,7 +216,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                         }
                         "alias" => v.to_string(),
                         "attributes" => v.to_string(),
-                        "script" => v.to_string(),
+                        // "script" => v.to_string(),
                         // ignore all unknown fields
                         x => {
                             warn!("{x} is unsupported!");

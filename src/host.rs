@@ -60,6 +60,22 @@ pub async fn get_hosts_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<
     (StatusCode::OK, Json(host_vec))
 }
 
+pub async fn update_text_field(
+    id: String,
+    column: &str,
+    data: String,
+    connection: PoolConnection<Sqlite>,
+) -> SqliteQueryResult {
+    crate::db::update_text_field(id, column, data, "hosts", connection).await
+}
+
+pub async fn update_timestamp(
+    id: String,
+    column: &str,
+    connection: PoolConnection<Sqlite>,
+) -> SqliteQueryResult {
+    crate::db::update_timestamp(id, column, "hosts", connection).await
+}
 // async fn single_agent_api(
 //     Path(id): Path<Uuid>,
 //     State(pool): State<SqlitePool>,

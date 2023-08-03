@@ -21,11 +21,12 @@
 
 ### executions
 
-| id | varchar(36) | uuid
-| timestamp | TEXT | as ISO8601 strings ("YYYY-MM-DD HH:MM:SS.SSS")
-| host_id | varchar(36) | uuid
-| script_id | varchar(36) | uuid
-| output | text |
+| id | TEXT | uuid
+| request | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS.SSS")
+| response | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS.SSS")
+| host_id | TEXT | uuid
+| script_id | TEXT | uuid
+| output | TEXT |
 
 ### scheduling
 

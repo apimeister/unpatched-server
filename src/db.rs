@@ -6,7 +6,10 @@ use crate::{
     script::{get_script_id_by_name_from_db, Script},
 };
 use sqlx::{
-    pool::PoolConnection, query, sqlite::SqliteConnectOptions, Pool, Row, Sqlite, SqlitePool,
+    pool::PoolConnection,
+    query,
+    sqlite::{SqliteConnectOptions, SqliteQueryResult},
+    Pool, Row, Sqlite, SqlitePool,
 };
 use tracing::{debug, info, warn};
 
@@ -130,10 +133,11 @@ async fn create_scripts_table(mut connection: PoolConnection<Sqlite>) -> Result<
 /// | Name | Type | Comment
 /// :--- | :--- | :---
 /// | id | TEXT | uuid
-/// | timestamp | TEXT | timestamp as ISO8601 strings ("YYYY-MM-DD HH:MM:SS.SSS")
+/// | request | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS.SSS")
+/// | response | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS.SSS")
 /// | host_id | TEXT | uuid
 /// | script_id | TEXT | uuid
-/// | output | TEXT | return value from script
+/// | output | TEXT |
 async fn create_executions_table(
     mut connection: PoolConnection<Sqlite>,
 ) -> Result<(), sqlx::Error> {
@@ -141,7 +145,8 @@ async fn create_executions_table(
         r#"CREATE TABLE IF NOT EXISTS 
         executions(
             id TEXT PRIMARY KEY NOT NULL,
-            timestamp TEXT,
+            request TEXT,
+            response TEXT,
             host_id TEXT,
             script_id TEXT,
             output TEXT
@@ -236,6 +241,36 @@ async fn init_scheduling_table(pool: &Pool<Sqlite>) -> Option<()> {
     } else {
         Some(())
     }
+}
+
+pub async fn update_text_field(
+    id: String,
+    column: &str,
+    data: String,
+    table: &str,
+    mut connection: PoolConnection<Sqlite>,
+) -> SqliteQueryResult {
+    let stmt = format!("UPDATE {} SET {} = ? WHERE id = ?", table, column);
+    query(&stmt)
+        .bind(data)
+        .bind(id)
+        .execute(&mut *connection)
+        .await
+        .unwrap()
+}
+
+pub async fn update_timestamp(
+    id: String,
+    column: &str,
+    table: &str,
+    mut connection: PoolConnection<Sqlite>,
+) -> SqliteQueryResult {
+    let stmt = format!("UPDATE {} SET {} = datetime() WHERE id = ?", table, column);
+    query(&stmt)
+        .bind(id)
+        .execute(&mut *connection)
+        .await
+        .unwrap()
 }
 
 #[cfg(test)]

@@ -10,6 +10,7 @@ use clap::Parser;
 use futures::{sink::SinkExt, stream::StreamExt};
 use futures_util::stream::SplitSink;
 use include_dir::{include_dir, Dir};
+use serde::{Deserialize, Serialize};
 use sqlx::{query, sqlite::SqlitePool};
 use std::time::Duration;
 use std::{net::SocketAddr, sync::Arc};
@@ -22,10 +23,17 @@ use tracing::{debug, error, info, warn};
 use tracing_subscriber::{fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter};
 use uuid::Uuid;
 mod db;
+mod execution;
 mod host;
 mod schedule;
 mod script;
 mod swagger;
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
+struct ScriptExec {
+    pub id: String,
+    pub script: script::Script,
+}
 
 static WEBPAGE: Dir = include_dir!("$CARGO_MANIFEST_DIR/target/site");
 
@@ -80,6 +88,10 @@ async fn main() {
         .route(
             "/api/v1/schedules",
             get(schedule::get_schedules_api).with_state(pool.clone()),
+        )
+        .route(
+            "/api/v1/executions",
+            get(execution::get_executions_api).with_state(pool.clone()),
         )
         .route("/api", get(swagger::api_ui))
         .route("/api/v1", get(swagger::api_ui))
@@ -138,11 +150,29 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
             .await;
             let scripts = script::get_scripts_from_db(sender_pool.acquire().await.unwrap()).await;
             for script in scripts {
-                debug!(" sending script: {:?}", script);
-                let json_script = match serde_json::to_string(&script) {
+                let script_exec = ScriptExec {
+                    id: new_id(),
+                    script,
+                };
+                let exec = execution::Execution {
+                    id: script_exec.id.clone(),
+                    script_id: script_exec.script.id.clone(),
+                    host_id: sender_arc_id.lock().await.clone().unwrap_or("".into()),
+                    ..Default::default()
+                };
+                exec.insert_into_db(sender_pool.acquire().await.unwrap())
+                    .await;
+                execution::update_timestamp(
+                    script_exec.id.clone(),
+                    "request",
+                    sender_pool.acquire().await.unwrap(),
+                )
+                .await;
+                debug!(" sending script: {:?}", script_exec);
+                let json_script = match serde_json::to_string(&script_exec) {
                     Ok(j) => j,
                     Err(e) => {
-                        error!("Could not transform script {} to json\n{e}", script.id);
+                        error!("Could not transform script {} to json\n{e}", script_exec.id);
                         continue;
                     }
                 };
@@ -151,6 +181,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     Message::Text(format!("script:{json_script}")),
                 )
                 .await;
+                // insert new execution into DB
             }
             tokio::time::sleep(UPDATE_RATE).await;
         }
@@ -187,11 +218,12 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     // without ID, skip and wait for next update cycle
                     if let Some(uuid) = recv_arc_id.lock().await.clone() {
                         debug!("Update agent {uuid} as alive (hosts table -> last pong)!");
-                        let _ = query(r#"UPDATE hosts SET last_pong = datetime() WHERE id = ?"#)
-                            .bind(uuid)
-                            .execute(&mut *receiver_pool.acquire().await.unwrap())
-                            .await
-                            .unwrap();
+                        host::update_timestamp(
+                            uuid,
+                            "last_pong",
+                            receiver_pool.acquire().await.unwrap(),
+                        )
+                        .await;
                     }
                 }
 
@@ -216,7 +248,24 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                         }
                         "alias" => v.to_string(),
                         "attributes" => v.to_string(),
-                        // "script" => v.to_string(),
+                        "script" => {
+                            let script_exec: ScriptExec = serde_json::from_str(v).unwrap();
+                            warn!("{:?}", script_exec);
+                            execution::update_timestamp(
+                                script_exec.id.clone(),
+                                "response",
+                                receiver_pool.acquire().await.unwrap(),
+                            )
+                            .await;
+                            execution::update_text_field(
+                                script_exec.id,
+                                "output",
+                                script_exec.script.script_content,
+                                receiver_pool.acquire().await.unwrap(),
+                            )
+                            .await;
+                            continue;
+                        }
                         // ignore all unknown fields
                         x => {
                             warn!("{x} is unsupported!");
@@ -226,13 +275,13 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     // without ID, skip and wait for next update cycle
                     if let Some(uuid) = recv_arc_id.lock().await.clone() {
                         debug!("Received some data for {k}: {data}");
-                        let stmt = format!("UPDATE hosts SET {k} = ? WHERE id = ?");
-                        let _ = query(&stmt)
-                            .bind(data)
-                            .bind(uuid)
-                            .execute(&mut *receiver_pool.acquire().await.unwrap())
-                            .await
-                            .unwrap();
+                        host::update_text_field(
+                            uuid,
+                            k,
+                            data,
+                            receiver_pool.acquire().await.unwrap(),
+                        )
+                        .await;
                     }
                 }
                 Message::Binary(_) => error!("Binary is unsupported!"),

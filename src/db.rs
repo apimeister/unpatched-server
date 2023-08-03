@@ -11,7 +11,7 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteQueryResult},
     Pool, Row, Sqlite, SqlitePool,
 };
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// create database
 /// * sqlite::memory: - Open an in-memory database
@@ -251,12 +251,18 @@ pub async fn update_text_field(
     mut connection: PoolConnection<Sqlite>,
 ) -> SqliteQueryResult {
     let stmt = format!("UPDATE {} SET {} = ? WHERE id = ?", table, column);
-    query(&stmt)
+    match query(&stmt)
         .bind(data)
-        .bind(id)
+        .bind(id.clone())
         .execute(&mut *connection)
         .await
-        .unwrap()
+    {
+        Ok(q) => q,
+        Err(e) => {
+            error!("Updating {column} for {id} in {table} failed\n{e}");
+            SqliteQueryResult::default()
+        }
+    }
 }
 
 pub async fn update_timestamp(
@@ -266,11 +272,17 @@ pub async fn update_timestamp(
     mut connection: PoolConnection<Sqlite>,
 ) -> SqliteQueryResult {
     let stmt = format!("UPDATE {} SET {} = datetime() WHERE id = ?", table, column);
-    query(&stmt)
-        .bind(id)
+    match query(&stmt)
+        .bind(id.clone())
         .execute(&mut *connection)
         .await
-        .unwrap()
+    {
+        Ok(q) => q,
+        Err(e) => {
+            error!("Updating {column} for {id} in {table} failed\n{e}");
+            SqliteQueryResult::default()
+        }
+    }
 }
 
 #[cfg(test)]

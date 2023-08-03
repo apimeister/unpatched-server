@@ -11,7 +11,7 @@ use futures::{sink::SinkExt, stream::StreamExt};
 use futures_util::stream::SplitSink;
 use include_dir::{include_dir, Dir};
 use serde::{Deserialize, Serialize};
-use sqlx::{query, sqlite::SqlitePool};
+use sqlx::sqlite::SqlitePool;
 use std::time::Duration;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
@@ -234,15 +234,13 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                             let mut id = recv_arc_id.lock().await;
                             if id.is_none() {
                                 *id = Some(v.into());
-                                let id_res = query(r#"INSERT INTO hosts(id, ip) VALUES (?, ?)"#)
-                                    .bind(v)
-                                    .bind(who.to_string())
-                                    .execute(&mut *receiver_pool.acquire().await.unwrap())
+                                let host = host::Host {
+                                    id: v.into(),
+                                    ip: who.to_string(),
+                                    ..Default::default()
+                                };
+                                host.insert_into_db(receiver_pool.acquire().await.unwrap())
                                     .await;
-                                // FIXME: This should be some real error handling
-                                if id_res.is_err() {
-                                    debug!("Agent with id {v} already known")
-                                }
                             }
                             continue;
                         }
@@ -250,7 +248,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                         "attributes" => v.to_string(),
                         "script" => {
                             let script_exec: ScriptExec = serde_json::from_str(v).unwrap();
-                            warn!("{:?}", script_exec);
+                            debug!("{:?}", script_exec);
                             execution::update_timestamp(
                                 script_exec.id.clone(),
                                 "response",

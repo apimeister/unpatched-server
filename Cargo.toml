@@ -24,7 +24,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.4", features = [ "v4", "fast-rng", "macro-diagnostics", "serde"]}
 
 [build-dependencies]
-hugo-build = "0.115"
+hugo-build = "0.116"
 
 [[bin]]
 name = "unpatched-server"

@@ -19,13 +19,7 @@ use tower_http::{
     trace::{DefaultMakeSpan, TraceLayer},
 };
 use tracing::{debug, error, info, warn};
-use tracing_subscriber::{
-    fmt::{self},
-    layer::SubscriberExt,
-    registry,
-    util::SubscriberInitExt,
-    EnvFilter,
-};
+use tracing_subscriber::{fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter};
 use uuid::Uuid;
 mod db;
 mod host;
@@ -56,7 +50,12 @@ async fn main() {
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .with(fmt::layer())
         .init();
-    let pool = db::create_datase(SQLITE_DB).await;
+    let pool = db::create_database(SQLITE_DB)
+        .await
+        .expect("Unable to create database connection!");
+    db::init_database(&pool)
+        .await
+        .expect("Unable to initialize database!");
 
     let web_page = ServeDir::new(WEBPAGE.path().join("target").join("site"))
         .append_index_html_on_directories(true);

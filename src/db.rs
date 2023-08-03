@@ -11,45 +11,64 @@ use sqlx::{
 use tracing::{debug, info, warn};
 
 /// create database
-/// sqlite::memory: - Open an in-memory database
-/// sqlite:data.db - Open the file data.db in the current directory.
-/// sqlite://data.db - Open the file data.db in the current directory.
-/// sqlite:///data.db - Open the file data.db from the root (/) directory.
-/// sqlite://data.db?mode=ro - Open the file data.db for read-only access.
+/// * sqlite::memory: - Open an in-memory database
+/// * sqlite:data.db - Open the file data.db in the current directory.
+/// * sqlite://data.db - Open the file data.db in the current directory.
+/// * sqlite:///data.db - Open the file data.db from the root (/) directory.
+/// * sqlite://data.db?mode=ro - Open the file data.db for read-only access.
+///
 /// types: https://www.sqlite.org/datatype3.html
-pub async fn create_datase(connection: &str) -> SqlitePool {
-    let connection_options = SqliteConnectOptions::from_str(connection)
-        .unwrap()
-        .create_if_missing(true);
-    let pool = SqlitePool::connect_with(connection_options).await.unwrap();
-    let _t = create_hosts_table(pool.acquire().await.unwrap()).await;
-    let _t = create_scripts_table(pool.acquire().await.unwrap()).await;
-    let _t = create_executions_table(pool.acquire().await.unwrap()).await;
-    let _t = create_scheduling_table(pool.acquire().await.unwrap()).await;
+pub async fn create_database(connection: &str) -> Result<SqlitePool, sqlx::Error> {
+    let connection_options = match SqliteConnectOptions::from_str(connection) {
+        Ok(c) => c,
+        Err(e) => {
+            return Err(sqlx::Error::Protocol(format!(
+                "Connection config could not be parsed!\n{e}"
+            )))
+        }
+    };
+    SqlitePool::connect_with(connection_options.create_if_missing(true)).await
+}
 
+/// Initialize Database with
+/// * hosts table
+/// * scripts table
+/// * executions table
+/// * scheduling table
+/// * sample scripts
+/// * sample schedules
+///
+/// More info: [DB.md](DB.md)
+pub async fn init_database(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+    create_hosts_table(pool.acquire().await?).await?;
+    create_scripts_table(pool.acquire().await?).await?;
+    create_executions_table(pool.acquire().await?).await?;
+    create_scheduling_table(pool.acquire().await?).await?;
+    let tables = query("PRAGMA table_list;")
+        .fetch_all(&mut *pool.acquire().await.unwrap())
+        .await?;
+    info!("DB Init: created {} tables", tables.len());
     let script_count = query("SELECT count(id) as id_count FROM scripts")
-        .fetch_one(&mut *pool.acquire().await.unwrap())
-        .await
-        .unwrap();
+        .fetch_one(&mut *pool.acquire().await?)
+        .await?;
     if script_count.get::<i32, _>("id_count") == 0 {
-        init_scripts_table(&pool).await
+        init_scripts_table(pool).await
     } else {
         debug!("DB init: script table has scripts, samples not loaded");
     }
 
     let schedule_count = query("SELECT count(id) as id_count FROM scheduling")
-        .fetch_one(&mut *pool.acquire().await.unwrap())
-        .await
-        .unwrap();
+        .fetch_one(&mut *pool.acquire().await?)
+        .await?;
     if schedule_count.get::<i32, _>("id_count") == 0 {
-        match init_scheduling_table(&pool).await {
+        match init_scheduling_table(pool).await {
             Some(_) => info!("DB init: sample schedules loaded"),
             None => warn!("DB init: Could not initialize sample schedules, starting with empty schedule table")
         }
     } else {
         debug!("DB init: scheduling table has schedules, samples not loaded");
     }
-    pool
+    Ok(())
 }
 
 /// Create hosts table in SQLite database
@@ -62,7 +81,7 @@ pub async fn create_datase(connection: &str) -> SqlitePool {
 /// | ip | TEXT | host ip:port
 /// | last_pong | TEXT | last checkin from agent
 async fn create_hosts_table(mut connection: PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
-    let res = query(
+    let _res = query(
         r#"CREATE TABLE IF NOT EXISTS 
         hosts(
             id TEXT PRIMARY KEY NOT NULL,
@@ -74,11 +93,6 @@ async fn create_hosts_table(mut connection: PoolConnection<Sqlite>) -> Result<()
     )
     .execute(&mut *connection)
     .await?;
-    if res.rows_affected() > 0 {
-        info!("DB init: created hosts table");
-    } else {
-        debug!("DB init: hosts table already present");
-    };
     Ok(())
 }
 
@@ -94,7 +108,7 @@ async fn create_hosts_table(mut connection: PoolConnection<Sqlite>) -> Result<()
 /// | timeout | TEXT | timeout (1s, 5m, 3h etc.)
 /// | script_content | TEXT | original script
 async fn create_scripts_table(mut connection: PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
-    let res = query(
+    let _res = query(
         r#"CREATE TABLE IF NOT EXISTS 
         scripts(
             id TEXT PRIMARY KEY NOT NULL,
@@ -108,11 +122,6 @@ async fn create_scripts_table(mut connection: PoolConnection<Sqlite>) -> Result<
     )
     .execute(&mut *connection)
     .await?;
-    if res.rows_affected() > 0 {
-        info!("DB init: created scripts table");
-    } else {
-        debug!("DB init: scripts table already present");
-    };
     Ok(())
 }
 
@@ -128,7 +137,7 @@ async fn create_scripts_table(mut connection: PoolConnection<Sqlite>) -> Result<
 async fn create_executions_table(
     mut connection: PoolConnection<Sqlite>,
 ) -> Result<(), sqlx::Error> {
-    let res = query(
+    let _res = query(
         r#"CREATE TABLE IF NOT EXISTS 
         executions(
             id TEXT PRIMARY KEY NOT NULL,
@@ -140,11 +149,6 @@ async fn create_executions_table(
     )
     .execute(&mut *connection)
     .await?;
-    if res.rows_affected() > 0 {
-        info!("DB init: created executions table");
-    } else {
-        debug!("DB init: executions table already present");
-    };
     Ok(())
 }
 
@@ -160,7 +164,7 @@ async fn create_executions_table(
 async fn create_scheduling_table(
     mut connection: PoolConnection<Sqlite>,
 ) -> Result<(), sqlx::Error> {
-    let res = query(
+    let _res = query(
         r#"CREATE TABLE IF NOT EXISTS 
         scheduling(
             id TEXT PRIMARY KEY NOT NULL,
@@ -172,12 +176,6 @@ async fn create_scheduling_table(
     )
     .execute(&mut *connection)
     .await?;
-    if res.rows_affected() > 0 {
-        info!("DB init: created scheduling table");
-        info!("{res:?}");
-    } else {
-        debug!("DB init: scheduling table already present");
-    };
     Ok(())
 }
 
@@ -237,5 +235,31 @@ async fn init_scheduling_table(pool: &Pool<Sqlite>) -> Option<()> {
         None
     } else {
         Some(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tracing_subscriber::{
+        fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
+    };
+
+    #[tokio::test]
+    async fn test_init_database() {
+        registry()
+            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
+            .with(fmt::layer())
+            .init();
+        let pool = create_database("sqlite::memory:").await.unwrap();
+        init_database(&pool).await.unwrap();
+        // let x = query("SELECT count(id) as id FROM scripts")
+        let tables = query("PRAGMA table_list;")
+            .fetch_all(&mut *pool.acquire().await.unwrap())
+            .await
+            .unwrap();
+        assert_eq!(tables.len(), 6);
+        // run again to check already-present branch
+        init_database(&pool).await.unwrap();
     }
 }

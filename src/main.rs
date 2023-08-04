@@ -148,18 +148,25 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                 ),
             )
             .await;
-            let scripts = script::get_scripts_from_db(sender_pool.acquire().await.unwrap()).await;
+            let scripts = script::get_scripts_from_db(
+                Some("labels LIKE '%mac%'"),
+                sender_pool.acquire().await.unwrap(),
+            )
+            .await;
             for script in scripts {
+                // info!("{:?}", script);
                 let script_exec = ScriptExec {
                     id: new_id(),
                     script,
                 };
+                // info!("{:?}", script_exec);
                 let exec = execution::Execution {
                     id: script_exec.id.clone(),
                     script_id: script_exec.script.id.clone(),
                     host_id: sender_arc_id.lock().await.clone().unwrap_or("".into()),
                     ..Default::default()
                 };
+                // info!("{:?}", exec);
                 exec.insert_into_db(sender_pool.acquire().await.unwrap())
                     .await;
                 execution::update_timestamp(
@@ -168,7 +175,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     sender_pool.acquire().await.unwrap(),
                 )
                 .await;
-                debug!(" sending script: {:?}", script_exec);
+                // info!(" sending script: {:?}", script_exec);
                 let json_script = match serde_json::to_string(&script_exec) {
                     Ok(j) => j,
                     Err(e) => {

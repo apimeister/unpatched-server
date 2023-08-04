@@ -71,3 +71,7 @@ pub async fn get_schedules_from_db(mut connection: PoolConnection<Sqlite>) -> Ve
     }
     schedule_vec
 }
+
+pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx::Error> {
+    crate::db::count_rows("scheduling", connection).await
+}

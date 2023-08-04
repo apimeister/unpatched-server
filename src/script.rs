@@ -38,9 +38,13 @@ impl Script {
     }
 }
 
+pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx::Error> {
+    crate::db::count_rows("scripts", connection).await
+}
+
 /// API to get all scripts
 pub async fn get_scripts_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<Vec<Script>>) {
-    let script_vec = get_scripts_from_db(pool.acquire().await.unwrap()).await;
+    let script_vec = get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
     if script_vec.is_empty() {
         (StatusCode::NOT_FOUND, Json(script_vec))
     } else {
@@ -48,11 +52,16 @@ pub async fn get_scripts_api(State(pool): State<SqlitePool>) -> (StatusCode, Jso
     }
 }
 
-pub async fn get_scripts_from_db(mut connection: PoolConnection<Sqlite>) -> Vec<Script> {
-    let scripts = match query("SELECT * FROM scripts")
-        .fetch_all(&mut *connection)
-        .await
-    {
+pub async fn get_scripts_from_db(
+    filter: Option<&str>,
+    mut connection: PoolConnection<Sqlite>,
+) -> Vec<Script> {
+    let stmt = if let Some(f) = filter {
+        format!("SELECT * FROM scripts WHERE {f}")
+    } else {
+        "SELECT * FROM scripts".into()
+    };
+    let scripts = match query(&stmt).fetch_all(&mut *connection).await {
         Ok(d) => d,
         Err(_) => return Vec::new(),
     };
@@ -72,18 +81,4 @@ pub async fn get_scripts_from_db(mut connection: PoolConnection<Sqlite>) -> Vec<
         script_vec.push(script);
     }
     script_vec
-}
-
-pub async fn get_script_id_by_name_from_db(
-    name: String,
-    mut connection: PoolConnection<Sqlite>,
-) -> Option<String> {
-    match query("SELECT id FROM scripts WHERE name = ?")
-        .bind(name)
-        .fetch_one(&mut *connection)
-        .await
-    {
-        Ok(s) => Some(s.get::<String, _>("id")),
-        Err(_) => None,
-    }
 }

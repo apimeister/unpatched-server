@@ -2,8 +2,8 @@ use std::str::FromStr;
 
 use crate::{
     new_id,
-    schedule::Schedule,
-    script::{get_script_id_by_name_from_db, Script},
+    schedule::{self, Schedule},
+    script::{self, Script},
 };
 use sqlx::{
     pool::PoolConnection,
@@ -51,25 +51,12 @@ pub async fn init_database(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         .fetch_all(&mut *pool.acquire().await.unwrap())
         .await?;
     info!("DB Init: created {} tables", tables.len());
-    let script_count = query("SELECT count(id) as id_count FROM scripts")
-        .fetch_one(&mut *pool.acquire().await?)
-        .await?;
-    if script_count.get::<i32, _>("id_count") == 0 {
-        init_scripts_table(pool).await
+    let script_count = script::count_rows(pool.acquire().await?).await?;
+    let schedule_count = schedule::count_rows(pool.acquire().await?).await?;
+    if script_count == 0 && schedule_count == 0 {
+        init_samples(pool).await
     } else {
-        debug!("DB init: script table has scripts, samples not loaded");
-    }
-
-    let schedule_count = query("SELECT count(id) as id_count FROM scheduling")
-        .fetch_one(&mut *pool.acquire().await?)
-        .await?;
-    if schedule_count.get::<i32, _>("id_count") == 0 {
-        match init_scheduling_table(pool).await {
-            Some(_) => info!("DB init: sample schedules loaded"),
-            None => warn!("DB init: Could not initialize sample schedules, starting with empty schedule table")
-        }
-    } else {
-        debug!("DB init: scheduling table has schedules, samples not loaded");
+        debug!("DB init: script table or scheduling table has data, samples not loaded");
     }
     Ok(())
 }
@@ -184,62 +171,82 @@ async fn create_scheduling_table(
     Ok(())
 }
 
-async fn init_scripts_table(pool: &Pool<Sqlite>) {
-    let uptime = Script {
+async fn init_samples(pool: &Pool<Sqlite>) {
+    let uptime_linux = Script {
         id: new_id(),
         name: "uptime".into(),
         version: "0.0.1".into(),
         output_regex: ".*".into(),
-        labels: "sample,sample2".into(),
+        labels: "linux,sample2".into(),
         timeout: "5s".into(),
         script_content: r#"uptime -p"#.into(),
     };
-    let os_version = Script {
+    let os_version_linux = Script {
         id: new_id(),
         name: "os_version".into(),
         version: "0.0.1".into(),
         output_regex: ".*".into(),
-        labels: "sample,sample2".into(),
+        labels: "linux,sample2".into(),
         timeout: "5s".into(),
         script_content: r#"cat /etc/os-release"#.into(),
     };
-    let uptime_res = uptime.insert_into_db(pool.acquire().await.unwrap()).await;
-    let os_ver_res = os_version
-        .insert_into_db(pool.acquire().await.unwrap())
-        .await;
-    if uptime_res.rows_affected() > 0 && os_ver_res.rows_affected() > 0 {
-        info!("DB init: sample scripts loaded");
-    } else {
-        warn!("DB init: Could not initialize sample scripts, starting with empty script table");
-    }
-}
-
-async fn init_scheduling_table(pool: &Pool<Sqlite>) -> Option<()> {
-    let uptime_id =
-        get_script_id_by_name_from_db("uptime".into(), pool.acquire().await.unwrap()).await?;
-    let os_version_id =
-        get_script_id_by_name_from_db("os_version".into(), pool.acquire().await.unwrap()).await?;
-
-    let uptime = Schedule {
+    let uptime_mac = Script {
         id: new_id(),
-        script_id: uptime_id,
-        attributes: "attr1,attr2".into(),
-        cron: "* * * * *".into(),
-        active: true,
+        name: "uptime".into(),
+        version: "0.0.1".into(),
+        output_regex: ".*".into(),
+        labels: "mac,sample2".into(),
+        timeout: "5s".into(),
+        script_content: r#"uptime"#.into(),
     };
-    let os_ver = Schedule {
+    let os_version_mac = Script {
         id: new_id(),
-        script_id: os_version_id,
-        attributes: "attr1,attr2".into(),
-        cron: "* * * * *".into(),
-        active: true,
+        name: "os_version".into(),
+        version: "0.0.1".into(),
+        output_regex: ".*".into(),
+        labels: "mac,sample2".into(),
+        timeout: "5s".into(),
+        script_content: r#"sw_vers"#.into(),
     };
-    let uptime_res = uptime.insert_into_db(pool.acquire().await.unwrap()).await;
-    let os_ver_res = os_ver.insert_into_db(pool.acquire().await.unwrap()).await;
-    if uptime_res.rows_affected() == 0 || os_ver_res.rows_affected() == 0 {
-        None
-    } else {
-        Some(())
+    let v = vec![uptime_linux, os_version_linux, uptime_mac, os_version_mac];
+    for s in v {
+        let res = s
+            .clone()
+            .insert_into_db(pool.acquire().await.unwrap())
+            .await;
+        if res.rows_affected() > 0 {
+            info!(
+                "DB init: sample script {} version {} with labels {} loaded",
+                s.name, s.version, s.labels
+            );
+        } else {
+            warn!(
+                "DB init: sample script {} version {} with labels {} could not be loaded",
+                s.name, s.version, s.labels
+            );
+        }
+        let sched = Schedule {
+            id: new_id(),
+            script_id: s.id,
+            attributes: s.labels,
+            cron: "* * * * *".into(),
+            active: true,
+        };
+        let sched_res = sched
+            .clone()
+            .insert_into_db(pool.acquire().await.unwrap())
+            .await;
+        if sched_res.rows_affected() > 0 {
+            info!(
+                "DB init: sample schedule for script {} version {} with attributes {} loaded",
+                s.name, s.version, sched.attributes
+            );
+        } else {
+            warn!(
+                "DB init: sample schedule for script {} version {} with attributes {} could not be loaded",
+                s.name, s.version, sched.attributes
+            );
+        }
     }
 }
 
@@ -283,6 +290,15 @@ pub async fn update_timestamp(
             SqliteQueryResult::default()
         }
     }
+}
+
+pub async fn count_rows(
+    table: &str,
+    mut connection: PoolConnection<Sqlite>,
+) -> Result<i64, sqlx::Error> {
+    let stmt = format!("SELECT count(_rowid_) as id_count FROM {table}");
+    let script_count = query(&stmt).fetch_one(&mut *connection).await?;
+    Ok(script_count.get::<i64, _>("id_count"))
 }
 
 #[cfg(test)]

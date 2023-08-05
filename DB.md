@@ -32,7 +32,6 @@
 
 | id | varchar(36) | uuid
 | script_id | varchar(36) | uuid
-<!-- run on host with attribute (label) xxx -->
 | attributes | json |
 | cron | text |
 | active | bool |

@@ -12,6 +12,7 @@ use sqlx::{
     Pool, Row, Sqlite, SqlitePool,
 };
 use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 
 /// create database
 /// * sqlite::memory: - Open an in-memory database
@@ -177,7 +178,7 @@ async fn init_samples(pool: &Pool<Sqlite>) {
         name: "uptime".into(),
         version: "0.0.1".into(),
         output_regex: ".*".into(),
-        labels: "linux,sample2".into(),
+        labels: vec!["linux".to_string(), "sample1".to_string()],
         timeout: "5s".into(),
         script_content: r#"uptime -p"#.into(),
     };
@@ -186,7 +187,7 @@ async fn init_samples(pool: &Pool<Sqlite>) {
         name: "os_version".into(),
         version: "0.0.1".into(),
         output_regex: ".*".into(),
-        labels: "linux,sample2".into(),
+        labels: vec!["linux".to_string(), "sample2".to_string()],
         timeout: "5s".into(),
         script_content: r#"cat /etc/os-release"#.into(),
     };
@@ -195,7 +196,7 @@ async fn init_samples(pool: &Pool<Sqlite>) {
         name: "uptime".into(),
         version: "0.0.1".into(),
         output_regex: ".*".into(),
-        labels: "mac,sample2".into(),
+        labels: vec!["mac".to_string(), "sample3".to_string()],
         timeout: "5s".into(),
         script_content: r#"uptime"#.into(),
     };
@@ -204,7 +205,7 @@ async fn init_samples(pool: &Pool<Sqlite>) {
         name: "os_version".into(),
         version: "0.0.1".into(),
         output_regex: ".*".into(),
-        labels: "mac,sample2".into(),
+        labels: vec!["mac".to_string(), "sample4".to_string()],
         timeout: "5s".into(),
         script_content: r#"sw_vers"#.into(),
     };
@@ -217,18 +218,22 @@ async fn init_samples(pool: &Pool<Sqlite>) {
         if res.rows_affected() > 0 {
             info!(
                 "DB init: sample script {} version {} with labels {} loaded",
-                s.name, s.version, s.labels
+                s.name,
+                s.version,
+                s.labels()
             );
         } else {
             warn!(
                 "DB init: sample script {} version {} with labels {} could not be loaded",
-                s.name, s.version, s.labels
+                s.name,
+                s.version,
+                s.labels()
             );
         }
         let sched = Schedule {
             id: new_id(),
             script_id: s.id,
-            attributes: s.labels,
+            attributes: vec![s.labels[0].clone()],
             cron: "* * * * *".into(),
             active: true,
         };
@@ -239,19 +244,21 @@ async fn init_samples(pool: &Pool<Sqlite>) {
         if sched_res.rows_affected() > 0 {
             info!(
                 "DB init: sample schedule for script {} version {} with attributes {} loaded",
-                s.name, s.version, sched.attributes
+                s.name,
+                s.version,
+                sched.attributes()
             );
         } else {
             warn!(
                 "DB init: sample schedule for script {} version {} with attributes {} could not be loaded",
-                s.name, s.version, sched.attributes
+                s.name, s.version, sched.attributes()
             );
         }
     }
 }
 
 pub async fn update_text_field(
-    id: String,
+    id: Uuid,
     column: &str,
     data: String,
     table: &str,
@@ -260,7 +267,8 @@ pub async fn update_text_field(
     let stmt = format!("UPDATE {} SET {} = ? WHERE id = ?", table, column);
     match query(&stmt)
         .bind(data)
-        .bind(id.clone())
+        // extra quotes are needed since uuid.json results in "value" instead of value
+        .bind(format!("\"{}\"", id))
         .execute(&mut *connection)
         .await
     {
@@ -273,14 +281,15 @@ pub async fn update_text_field(
 }
 
 pub async fn update_timestamp(
-    id: String,
+    id: Uuid,
     column: &str,
     table: &str,
     mut connection: PoolConnection<Sqlite>,
 ) -> SqliteQueryResult {
     let stmt = format!("UPDATE {} SET {} = datetime() WHERE id = ?", table, column);
     match query(&stmt)
-        .bind(id.clone())
+        // extra quotes are needed since uuid.json results in "value" instead of value
+        .bind(format!("\"{}\"", id))
         .execute(&mut *connection)
         .await
     {

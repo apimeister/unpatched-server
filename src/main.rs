@@ -3,7 +3,7 @@ use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
     extract::State,
     response::IntoResponse,
-    routing::get,
+    routing::{delete, get},
     Error, Router,
 };
 use clap::Parser;
@@ -31,7 +31,7 @@ mod swagger;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 struct ScriptExec {
-    pub id: String,
+    pub id: Uuid,
     pub script: script::Script,
 }
 
@@ -93,6 +93,10 @@ async fn main() {
             "/api/v1/executions",
             get(execution::get_executions_api).with_state(pool.clone()),
         )
+        .route(
+            "/api/v1/executions",
+            delete(execution::delete_executions_api).with_state(pool.clone()),
+        )
         .route("/api", get(swagger::api_ui))
         .route("/api/v1", get(swagger::api_ui))
         .route("/api/api.yaml", get(swagger::api_def))
@@ -125,7 +129,7 @@ async fn ws_handler(
 
 /// Actual websocket statemachine (one will be spawned per connection)
 async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
-    let id: Option<String> = None;
+    let id: Option<Uuid> = None;
     let arc_id = Arc::new(Mutex::new(id));
     // split websocket stream so we can have both directions working independently
     let (sender, mut receiver) = socket.split();
@@ -140,14 +144,9 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     let sender_arc_id = Arc::clone(&arc_id);
     let _sender_handle = tokio::spawn(async move {
         loop {
-            let id = sender_arc_id.lock().await.clone();
-            let _ping = send_message(
-                &sender_arc_sink,
-                Message::Ping(
-                    format!("Agent {} you there?", id.unwrap_or(who.to_string())).into_bytes(),
-                ),
-            )
-            .await;
+            let id = *sender_arc_id.lock().await;
+            let ping_msg = format!("Agent {} you there?", id.unwrap_or(Uuid::nil())).into_bytes();
+            let _ping = send_message(&sender_arc_sink, Message::Ping(ping_msg)).await;
             let scripts = script::get_scripts_from_db(
                 Some("labels LIKE '%mac%'"),
                 sender_pool.acquire().await.unwrap(),
@@ -161,16 +160,16 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                 };
                 // info!("{:?}", script_exec);
                 let exec = execution::Execution {
-                    id: script_exec.id.clone(),
-                    script_id: script_exec.script.id.clone(),
-                    host_id: sender_arc_id.lock().await.clone().unwrap_or("".into()),
+                    id: script_exec.id,
+                    script_id: script_exec.script.id,
+                    host_id: sender_arc_id.lock().await.unwrap_or(Uuid::nil()),
                     ..Default::default()
                 };
                 // info!("{:?}", exec);
                 exec.insert_into_db(sender_pool.acquire().await.unwrap())
                     .await;
                 execution::update_timestamp(
-                    script_exec.id.clone(),
+                    script_exec.id,
                     "request",
                     sender_pool.acquire().await.unwrap(),
                 )
@@ -223,7 +222,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     );
 
                     // without ID, skip and wait for next update cycle
-                    if let Some(uuid) = recv_arc_id.lock().await.clone() {
+                    if let Some(uuid) = *recv_arc_id.lock().await {
                         debug!("Update agent {uuid} as alive (hosts table -> last pong)!");
                         host::update_timestamp(
                             uuid,
@@ -236,28 +235,22 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
 
                 Message::Text(t) => {
                     let (k, v) = t.split_once(':').unwrap_or(("", ""));
-                    let data = match k {
-                        "id" => {
+                    match k {
+                        "host" => {
                             let mut id = recv_arc_id.lock().await;
-                            if id.is_none() {
-                                *id = Some(v.into());
-                                let host = host::Host {
-                                    id: v.into(),
-                                    ip: who.to_string(),
-                                    ..Default::default()
-                                };
-                                host.insert_into_db(receiver_pool.acquire().await.unwrap())
-                                    .await;
-                            }
+                            let mut host: host::Host = serde_json::from_str(v).unwrap();
+                            *id = Some(host.id);
+                            host.ip = who.to_string();
+                            debug!("{:?}", host);
+                            host.insert_into_db(receiver_pool.acquire().await.unwrap())
+                                .await;
                             continue;
                         }
-                        "alias" => v.to_string(),
-                        "attributes" => v.to_string(),
                         "script" => {
                             let script_exec: ScriptExec = serde_json::from_str(v).unwrap();
                             debug!("{:?}", script_exec);
                             execution::update_timestamp(
-                                script_exec.id.clone(),
+                                script_exec.id,
                                 "response",
                                 receiver_pool.acquire().await.unwrap(),
                             )
@@ -276,17 +269,6 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                             warn!("{x} is unsupported!");
                             continue;
                         }
-                    };
-                    // without ID, skip and wait for next update cycle
-                    if let Some(uuid) = recv_arc_id.lock().await.clone() {
-                        debug!("Received some data for {k}: {data}");
-                        host::update_text_field(
-                            uuid,
-                            k,
-                            data,
-                            receiver_pool.acquire().await.unwrap(),
-                        )
-                        .await;
                     }
                 }
                 Message::Binary(_) => error!("Binary is unsupported!"),
@@ -299,10 +281,8 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     let _ = recv_handle.await;
 }
 
-fn new_id() -> String {
-    let id = Uuid::new_v4();
-    let string_id = format!("{}", id.as_hyphenated());
-    string_id
+fn new_id() -> Uuid {
+    Uuid::new_v4().as_hyphenated().into_uuid()
 }
 
 // /// Get ARC to Splitsink and push message onto it

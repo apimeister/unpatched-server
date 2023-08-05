@@ -1,12 +1,13 @@
 use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolConnection, query, sqlite::SqliteQueryResult, Row, Sqlite, SqlitePool};
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 pub struct Schedule {
-    pub id: String,
-    pub script_id: String,
-    pub attributes: String,
+    pub id: Uuid,
+    pub script_id: Uuid,
+    pub attributes: Vec<String>,
     pub cron: String,
     pub active: bool,
 }
@@ -25,14 +26,17 @@ impl Schedule {
     // FIXME: write test and remove dead_code
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
         query(r#"INSERT INTO scheduling( id, script_id, attributes, cron, active ) VALUES ( ?, ?, ?, ?, ? )"#)
-            .bind(self.id)
-            .bind(self.script_id)
-            .bind(self.attributes)
+            .bind(serde_json::to_string(&self.id).unwrap())
+            .bind(serde_json::to_string(&self.script_id).unwrap())
+            .bind(serde_json::to_string(&self.attributes).unwrap())
             .bind(self.cron)
             .bind(self.active)
             .execute(&mut *connection)
             .await
             .unwrap()
+    }
+    pub fn attributes(&self) -> String {
+        self.attributes.join(",")
     }
 }
 
@@ -61,9 +65,9 @@ pub async fn get_schedules_from_db(mut connection: PoolConnection<Sqlite>) -> Ve
 
     for s in schedules {
         let schedule = Schedule {
-            id: s.get::<String, _>("id"),
-            script_id: s.get::<String, _>("script_id"),
-            attributes: s.get::<String, _>("attributes"),
+            id: serde_json::from_str(&s.get::<String, _>("id")).unwrap(),
+            script_id: serde_json::from_str(&s.get::<String, _>("script_id")).unwrap(),
+            attributes: serde_json::from_str(&s.get::<String, _>("attributes")).unwrap(),
             cron: s.get::<String, _>("cron"),
             active: s.get::<bool, _>("active"),
         };

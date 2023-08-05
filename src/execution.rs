@@ -1,14 +1,15 @@
 use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolConnection, query, sqlite::SqliteQueryResult, Row, Sqlite, SqlitePool};
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 pub struct Execution {
-    pub id: String,
+    pub id: Uuid,
     pub request: String,
     pub response: String,
-    pub host_id: String,
-    pub script_id: String,
+    pub host_id: Uuid,
+    pub script_id: Uuid,
     pub output: String,
 }
 
@@ -25,11 +26,11 @@ impl Execution {
     /// | output | TEXT |
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
         query(r#"INSERT INTO executions( id, request, response, host_id, script_id, output ) VALUES ( ?, ?, ?, ?, ?, ? )"#)
-            .bind(self.id)
+            .bind(serde_json::to_string(&self.id).unwrap())
             .bind(self.request)
             .bind(self.response)
-            .bind(self.host_id)
-            .bind(self.script_id)
+            .bind(serde_json::to_string(&self.host_id).unwrap())
+            .bind(serde_json::to_string(&self.script_id).unwrap())
             .bind(self.output)
             .execute(&mut *connection)
             .await
@@ -49,6 +50,18 @@ pub async fn get_executions_api(
     }
 }
 
+/// API to get all scripts
+pub async fn delete_executions_api(State(pool): State<SqlitePool>) -> StatusCode {
+    let executions = query("DELETE FROM executions")
+        .execute(&mut *pool.acquire().await.unwrap())
+        .await;
+    if executions.is_err() {
+        StatusCode::FORBIDDEN
+    } else {
+        StatusCode::OK
+    }
+}
+
 pub async fn get_executions_from_db(mut connection: PoolConnection<Sqlite>) -> Vec<Execution> {
     let executions = match query("SELECT * FROM executions")
         .fetch_all(&mut *connection)
@@ -62,11 +75,11 @@ pub async fn get_executions_from_db(mut connection: PoolConnection<Sqlite>) -> V
 
     for s in executions {
         let execution = Execution {
-            id: s.get::<String, _>("id"),
+            id: serde_json::from_str(&s.get::<String, _>("id")).unwrap(),
             request: s.get::<String, _>("request"),
             response: s.get::<String, _>("response"),
-            host_id: s.get::<String, _>("host_id"),
-            script_id: s.get::<String, _>("script_id"),
+            host_id: serde_json::from_str(&s.get::<String, _>("host_id")).unwrap(),
+            script_id: serde_json::from_str(&s.get::<String, _>("script_id")).unwrap(),
             output: s.get::<String, _>("output"),
         };
         execution_vec.push(execution);
@@ -75,7 +88,7 @@ pub async fn get_executions_from_db(mut connection: PoolConnection<Sqlite>) -> V
 }
 
 pub async fn update_text_field(
-    id: String,
+    id: Uuid,
     column: &str,
     data: String,
     connection: PoolConnection<Sqlite>,
@@ -84,7 +97,7 @@ pub async fn update_text_field(
 }
 
 pub async fn update_timestamp(
-    id: String,
+    id: Uuid,
     column: &str,
     connection: PoolConnection<Sqlite>,
 ) -> SqliteQueryResult {

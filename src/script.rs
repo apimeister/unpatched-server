@@ -1,14 +1,15 @@
 use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolConnection, query, sqlite::SqliteQueryResult, Row, Sqlite, SqlitePool};
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 pub struct Script {
-    pub id: String,
+    pub id: Uuid,
     pub name: String,
     pub version: String,
     pub output_regex: String,
-    pub labels: String,
+    pub labels: Vec<String>,
     pub timeout: String,
     pub script_content: String,
 }
@@ -27,14 +28,17 @@ impl Script {
     /// | script_content | TEXT | original script
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
         query(r#"INSERT INTO scripts( id, name, version, output_regex, labels, timeout, script_content ) VALUES ( ?, ?, ?, ?, ?, ?, ? )"#)
-        .bind(self.id)
+        .bind(serde_json::to_string(&self.id).unwrap())
         .bind(self.name)
         .bind(self.version)
         .bind(self.output_regex)
-        .bind(self.labels)
+        .bind(serde_json::to_string(&self.labels).unwrap())
         .bind(self.timeout)
         .bind(self.script_content)
         .execute(&mut *connection).await.unwrap()
+    }
+    pub fn labels(&self) -> String {
+        self.labels.join(",")
     }
 }
 
@@ -69,12 +73,13 @@ pub async fn get_scripts_from_db(
     let mut script_vec: Vec<Script> = Vec::new();
 
     for s in scripts {
+        let id = serde_json::from_str(&s.get::<String, _>("id")).unwrap();
         let script = Script {
-            id: s.get::<String, _>("id"),
+            id,
             name: s.get::<String, _>("name"),
             version: s.get::<String, _>("version"),
             output_regex: s.get::<String, _>("output_regex"),
-            labels: s.get::<String, _>("labels"),
+            labels: serde_json::from_str(&s.get::<String, _>("labels")).unwrap(),
             timeout: s.get::<String, _>("timeout"),
             script_content: s.get::<String, _>("script_content"),
         };

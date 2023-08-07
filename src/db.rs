@@ -8,7 +8,7 @@ use crate::{
 use sqlx::{
     pool::PoolConnection,
     query,
-    sqlite::{SqliteConnectOptions, SqliteQueryResult},
+    sqlite::{SqliteConnectOptions, SqliteQueryResult, SqliteRow},
     Pool, Row, Sqlite, SqlitePool,
 };
 use tracing::{debug, error, info, warn};
@@ -308,6 +308,15 @@ pub async fn count_rows(
     let stmt = format!("SELECT count(_rowid_) as id_count FROM {table}");
     let script_count = query(&stmt).fetch_one(&mut *connection).await?;
     Ok(script_count.get::<i64, _>("id_count"))
+}
+
+pub fn get_option(row: &SqliteRow, column: &str) -> Option<String> {
+    let res = row.get::<String, _>(column);
+    if res.is_empty() {
+        None
+    } else {
+        Some(res)
+    }
 }
 
 #[cfg(test)]

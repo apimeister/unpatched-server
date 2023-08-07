@@ -3,7 +3,7 @@ use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
     extract::State,
     response::IntoResponse,
-    routing::{delete, get},
+    routing::get,
     Error, Router,
 };
 use clap::Parser;
@@ -91,11 +91,10 @@ async fn main() {
         )
         .route(
             "/api/v1/executions",
-            get(execution::get_executions_api).with_state(pool.clone()),
-        )
-        .route(
-            "/api/v1/executions",
-            delete(execution::delete_executions_api).with_state(pool.clone()),
+            get(execution::get_executions_api)
+                .delete(execution::delete_executions_api)
+                .post(execution::post_executions_api)
+                .with_state(pool.clone()),
         )
         .route("/api", get(swagger::api_ui))
         .route("/api/v1", get(swagger::api_ui))
@@ -129,54 +128,101 @@ async fn ws_handler(
 
 /// Actual websocket statemachine (one will be spawned per connection)
 async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
-    let id: Option<Uuid> = None;
-    let arc_id = Arc::new(Mutex::new(id));
+    let this_host: Option<host::Host> = None;
+    let arc_this_host = Arc::new(Mutex::new(this_host));
     // split websocket stream so we can have both directions working independently
     let (sender, mut receiver) = socket.split();
     let arc_sink = Arc::new(Mutex::new(sender));
     info!("Connection established to agent: {}", who);
 
     // ##################
+    // General tasks
+    // ##################
+
+    let _execution_creator_handle = tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(UPDATE_RATE).await;
+            // TODO: Implement scheduler for executions
+        }
+    });
+
+    // ##################
     // ALL THE SEND STUFF
     // ##################
     let sender_pool = pool.clone();
     let sender_arc_sink = Arc::clone(&arc_sink);
-    let sender_arc_id = Arc::clone(&arc_id);
+    let sender_arc_this_host = Arc::clone(&arc_this_host);
     let _sender_handle = tokio::spawn(async move {
         loop {
-            let id = *sender_arc_id.lock().await;
-            let ping_msg = format!("Agent {} you there?", id.unwrap_or(Uuid::nil())).into_bytes();
+            tokio::time::sleep(UPDATE_RATE).await;
+            let arc_host = &*sender_arc_this_host.lock().await;
+            let host = match arc_host {
+                Some(h) => h,
+                None => continue,
+            };
+            let ping_msg = format!("Agent {} you there?", host.alias).into_bytes();
             let _ping = send_message(&sender_arc_sink, Message::Ping(ping_msg)).await;
-            let scripts = script::get_scripts_from_db(
-                Some("labels LIKE '%mac%'"),
+            // 1. get all executions where start date + timeout + x secs < now
+            // 2. get linked script
+            // 3. send script with execution id
+            // 4. update execution on return with timestamp
+            // FIXME: maybe add retries? and after some show as failed
+            let exec_filter = format!(
+                "request < date('now') 
+                AND response IS NULL 
+                AND host_id='\"{}\"'",
+                host.id
+            );
+            // FIXME: Filter out overdue executions (now() + x)
+            let execs = execution::get_executions_from_db(
+                Some(&exec_filter),
                 sender_pool.acquire().await.unwrap(),
             )
             .await;
-            for script in scripts {
-                // info!("{:?}", script);
-                let script_exec = ScriptExec {
-                    id: new_id(),
-                    script,
-                };
-                // info!("{:?}", script_exec);
-                let exec = execution::Execution {
-                    id: script_exec.id,
-                    script_id: script_exec.script.id,
-                    host_id: sender_arc_id.lock().await.unwrap_or(Uuid::nil()),
-                    ..Default::default()
-                };
-                // info!("{:?}", exec);
-                exec.insert_into_db(sender_pool.acquire().await.unwrap())
-                    .await;
-                execution::update_timestamp(
-                    script_exec.id,
-                    "request",
+            debug!("{:?}", execs);
+            let mut script_exec_vec = Vec::new();
+            for exe in execs {
+                let script_filter = format!("id = '\"{}\"'", exe.script_id);
+                let scripts = script::get_scripts_from_db(
+                    Some(&script_filter),
                     sender_pool.acquire().await.unwrap(),
                 )
                 .await;
-                // info!(" sending script: {:?}", script_exec);
+                debug!("{:?}", scripts);
+                let script = match scripts.first() {
+                    Some(s) => s.clone(),
+                    None => {
+                        warn!(
+                            "execution {} did not find a script with id {}. Execution Skipped",
+                            exe.id.unwrap(),
+                            exe.script_id
+                        );
+                        execution::update_timestamp(
+                            exe.id.unwrap(),
+                            "response",
+                            sender_pool.acquire().await.unwrap(),
+                        )
+                        .await;
+                        execution::update_text_field(
+                            exe.id.unwrap(),
+                            "output",
+                            "Script not found, execution skipped".into(),
+                            sender_pool.acquire().await.unwrap(),
+                        )
+                        .await;
+                        continue;
+                    }
+                };
+
+                let script_exec = ScriptExec {
+                    id: exe.id.unwrap(),
+                    script,
+                };
+                script_exec_vec.push(script_exec)
+            }
+            for script_exec in script_exec_vec {
                 let json_script = match serde_json::to_string(&script_exec) {
-                    Ok(j) => j,
+                    Ok(json) => json,
                     Err(e) => {
                         error!("Could not transform script {} to json\n{e}", script_exec.id);
                         continue;
@@ -187,9 +233,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     Message::Text(format!("script:{json_script}")),
                 )
                 .await;
-                // insert new execution into DB
             }
-            tokio::time::sleep(UPDATE_RATE).await;
         }
     });
     // #####################
@@ -197,7 +241,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     // #####################
     let receiver_pool = pool.clone();
     let recv_arc_sink = Arc::clone(&arc_sink);
-    let recv_arc_id = Arc::clone(&arc_id);
+    let recv_arc_this_host = Arc::clone(&arc_this_host);
 
     let recv_handle = tokio::spawn(async move {
         while let Some(Ok(msg)) = receiver.next().await {
@@ -222,10 +266,14 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     );
 
                     // without ID, skip and wait for next update cycle
-                    if let Some(uuid) = *recv_arc_id.lock().await {
-                        debug!("Update agent {uuid} as alive (hosts table -> last pong)!");
+                    let host_lock = &*recv_arc_this_host.lock().await;
+                    if let Some(host) = host_lock {
+                        debug!(
+                            "Update agent {} as alive (hosts table -> last pong)!",
+                            host.id
+                        );
                         host::update_timestamp(
-                            uuid,
+                            host.id,
                             "last_pong",
                             receiver_pool.acquire().await.unwrap(),
                         )
@@ -237,11 +285,12 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     let (k, v) = t.split_once(':').unwrap_or(("", ""));
                     match k {
                         "host" => {
-                            let mut id = recv_arc_id.lock().await;
                             let mut host: host::Host = serde_json::from_str(v).unwrap();
-                            *id = Some(host.id);
                             host.ip = who.to_string();
                             debug!("{:?}", host);
+
+                            let mut this_host = recv_arc_this_host.lock().await;
+                            *this_host = Some(host.clone());
                             host.insert_into_db(receiver_pool.acquire().await.unwrap())
                                 .await;
                             continue;

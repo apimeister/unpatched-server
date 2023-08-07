@@ -1,29 +1,33 @@
-openapi: 3.0.1
+openapi: 3.0.3
 info:
   title: Unpatched Server API
   version: 1.0.0
-  description: a generated client for the Unpatched Server API
+  description: |-
+    Unpatched Server API
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
   contact:
     name: Alexander Kunde
     email: alexander@apimeister.com
+externalDocs:
+  description: Find out more about Unpatched Server
+  url: https://github.com/apimeister/unpatched-server
 servers:
-- url: https://localhost:3000/api/{version}
-  variables:
-    version:
-      default: v1
-      enum:
-        - v1
+- url: http://localhost:3000/api/v1
+tags:
+  - name: executions
+    description: Everything about your executions
+    externalDocs:
+      description: Find out more
+      url: https://github.com/apimeister/unpatched-server
 paths:
   /agents:
     get:
       summary: get all agents
-      operationId: getAllContext
       responses:
         200:
-          description: status
+          description: all agents
   /agents/{agent_id}:
     get:
       summary: get agent information
@@ -32,9 +36,58 @@ paths:
           name: agent_id
           schema:
             type: string
-            format: uuid
+            format: uuid v4
           required: true
           description: agent id
       responses:
         200:
           description: agent information
+  /executions:
+    get:
+      tags:
+        - executions
+      summary: get all executions
+      responses:
+        200:
+          description: all executions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Execution'
+        404:
+          description: Not found
+    post:
+      tags:
+        - executions
+      summary: Add a new execution to the executions table
+      description: Add a new execution to the executions table
+      operationId: addExec
+      requestBody:
+        description: Create a new execution in the executions table
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Execution'
+        required: true
+      responses:
+        '201':
+          description: Successfully created
+        '400':
+          description: Invalid input
+components:
+  schemas:
+    Execution:
+      type: object
+      properties:
+        request:
+          type: string
+          format: date-time
+          example: 2023-01-01 23:12:01
+        host_id:
+          type: string
+          example: da77836d-1f63-4e30-b753-fe35784af63c
+        script_id:
+          type: string
+          example: da77836d-1f63-4e30-b753-fe35784af63c

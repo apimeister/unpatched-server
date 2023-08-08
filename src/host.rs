@@ -27,7 +27,7 @@ impl Host {
         let q = r#"INSERT INTO hosts(alias, attributes, ip, last_pong, id)
         VALUES(?, ?, ?, datetime(), ?)
         ON CONFLICT(id) DO UPDATE SET
-        alias = ?, attributes = ?, ip = ?, last_pong = datetime() 
+        alias = ?, attributes = ?, ip = ?, last_pong = datetime()
         WHERE id = ?"#;
         match query(q)
             .bind(self.alias)
@@ -58,10 +58,26 @@ impl Host {
 
 /// API to get all hosts
 pub async fn get_hosts_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<Vec<Host>>) {
-    let mut conn = pool.acquire().await.unwrap();
-    let hosts = match query("SELECT * FROM hosts").fetch_all(&mut *conn).await {
+    let host_vec = get_hosts_from_db(None, pool.acquire().await.unwrap()).await;
+    if host_vec.is_empty() {
+        (StatusCode::NOT_FOUND, Json(host_vec))
+    } else {
+        (StatusCode::OK, Json(host_vec))
+    }
+}
+
+pub async fn get_hosts_from_db(
+    filter: Option<&str>,
+    mut connection: PoolConnection<Sqlite>,
+) -> Vec<Host> {
+    let stmt = if let Some(f) = filter {
+        format!("SELECT * FROM hosts WHERE {f}")
+    } else {
+        "SELECT * FROM hosts".into()
+    };
+    let hosts = match query(&stmt).fetch_all(&mut *connection).await {
         Ok(d) => d,
-        Err(_) => return (StatusCode::NOT_FOUND, Json(Vec::new())),
+        Err(_) => return Vec::new(),
     };
 
     let mut host_vec: Vec<Host> = Vec::new();
@@ -76,8 +92,7 @@ pub async fn get_hosts_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<
         };
         host_vec.push(host);
     }
-
-    (StatusCode::OK, Json(host_vec))
+    host_vec
 }
 
 // pub async fn update_text_field(

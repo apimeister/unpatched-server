@@ -28,7 +28,7 @@ impl Script {
     /// | script_content | TEXT | original script
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
         query(r#"INSERT INTO scripts( id, name, version, output_regex, labels, timeout, script_content ) VALUES ( ?, ?, ?, ?, ?, ?, ? )"#)
-        .bind(serde_json::to_string(&self.id).unwrap())
+        .bind(self.id.to_string())
         .bind(self.name)
         .bind(self.version)
         .bind(self.output_regex)
@@ -73,9 +73,8 @@ pub async fn get_scripts_from_db(
     let mut script_vec: Vec<Script> = Vec::new();
 
     for s in scripts {
-        let id = serde_json::from_str(&s.get::<String, _>("id")).unwrap();
         let script = Script {
-            id,
+            id: s.get::<String, _>("id").parse().unwrap(),
             name: s.get::<String, _>("name"),
             version: s.get::<String, _>("version"),
             output_regex: s.get::<String, _>("output_regex"),

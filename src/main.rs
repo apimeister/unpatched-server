@@ -170,7 +170,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
             let exec_filter = format!(
                 "request < date('now') 
                 AND response IS NULL 
-                AND host_id='\"{}\"'",
+                AND host_id='{}'",
                 host.id
             );
             // FIXME: Filter out overdue executions (now() + x)
@@ -182,7 +182,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
             debug!("{:?}", execs);
             let mut script_exec_vec = Vec::new();
             for exe in execs {
-                let script_filter = format!("id = '\"{}\"'", exe.script_id);
+                let script_filter = format!("id = '{}'", exe.script_id);
                 let scripts = script::get_scripts_from_db(
                     Some(&script_filter),
                     sender_pool.acquire().await.unwrap(),

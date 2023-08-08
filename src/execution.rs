@@ -29,10 +29,10 @@ impl Execution {
     /// | output | TEXT | <-- implemented by another call, always created as NULL
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
         query(r#"INSERT INTO executions( id, request, host_id, script_id ) VALUES ( ?, ?, ?, ? )"#)
-            .bind(serde_json::to_string(&self.id).unwrap())
+            .bind(self.id.unwrap().to_string())
             .bind(self.request)
-            .bind(serde_json::to_string(&self.host_id).unwrap())
-            .bind(serde_json::to_string(&self.script_id).unwrap())
+            .bind(self.host_id.to_string())
+            .bind(self.script_id.to_string())
             .execute(&mut *connection)
             .await
             .unwrap()
@@ -96,11 +96,11 @@ pub async fn get_executions_from_db(
 
     for s in executions {
         let execution = Execution {
-            id: serde_json::from_str(&s.get::<String, _>("id")).unwrap(),
+            id: Some(s.get::<String, _>("id").parse().unwrap()),
             request: s.get::<String, _>("request"),
             response: db::get_option(&s, "response"),
-            host_id: serde_json::from_str(&s.get::<String, _>("host_id")).unwrap(),
-            script_id: serde_json::from_str(&s.get::<String, _>("script_id")).unwrap(),
+            host_id: s.get::<String, _>("host_id").parse().unwrap(),
+            script_id: s.get::<String, _>("script_id").parse().unwrap(),
             output: db::get_option(&s, "output"),
         };
         execution_vec.push(execution);

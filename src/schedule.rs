@@ -26,8 +26,8 @@ impl Schedule {
     // FIXME: write test and remove dead_code
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
         query(r#"INSERT INTO schedules( id, script_id, attributes, cron, active ) VALUES ( ?, ?, ?, ?, ? )"#)
-            .bind(serde_json::to_string(&self.id).unwrap())
-            .bind(serde_json::to_string(&self.script_id).unwrap())
+            .bind(self.id.to_string())
+            .bind(self.script_id.to_string())
             .bind(serde_json::to_string(&self.attributes).unwrap())
             .bind(self.cron)
             .bind(self.active)
@@ -70,8 +70,8 @@ pub async fn get_schedules_from_db(
 
     for s in schedules {
         let schedule = Schedule {
-            id: serde_json::from_str(&s.get::<String, _>("id")).unwrap(),
-            script_id: serde_json::from_str(&s.get::<String, _>("script_id")).unwrap(),
+            id: s.get::<String, _>("id").parse().unwrap(),
+            script_id: s.get::<String, _>("script_id").parse().unwrap(),
             attributes: serde_json::from_str(&s.get::<String, _>("attributes")).unwrap(),
             cron: s.get::<String, _>("cron"),
             active: s.get::<bool, _>("active"),

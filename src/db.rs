@@ -269,7 +269,7 @@ pub async fn update_text_field(
     match query(&stmt)
         .bind(data)
         // extra quotes are needed since uuid.json results in "value" instead of value
-        .bind(format!("\"{}\"", id))
+        .bind(id.to_string())
         .execute(&mut *connection)
         .await
     {
@@ -290,7 +290,7 @@ pub async fn update_timestamp(
     let stmt = format!("UPDATE {} SET {} = datetime() WHERE id = ?", table, column);
     match query(&stmt)
         // extra quotes are needed since uuid.json results in "value" instead of value
-        .bind(format!("\"{}\"", id))
+        .bind(id.to_string())
         .execute(&mut *connection)
         .await
     {

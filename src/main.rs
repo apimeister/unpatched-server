@@ -22,6 +22,7 @@ use tower_http::{
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::{fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter};
 use uuid::Uuid;
+
 mod db;
 mod execution;
 mod host;
@@ -136,13 +137,39 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     info!("Connection established to agent: {}", who);
 
     // ##################
-    // General tasks
+    // General tasks per Connection
     // ##################
-
-    let _execution_creator_handle = tokio::spawn(async move {
+    let general_pool = pool.clone();
+    let general_arc_this_host = Arc::clone(&arc_this_host);
+    let _general_handle = tokio::spawn(async move {
         loop {
-            tokio::time::sleep(UPDATE_RATE).await;
             // TODO: Implement scheduler for executions
+            let Some(host) = &*general_arc_this_host.lock().await else { continue };
+
+            let schedules = schedule::get_schedules_from_db(
+                Some("active = 1"),
+                general_pool.acquire().await.unwrap(),
+            )
+            .await;
+            let mut executable_schedules = Vec::new();
+            let mut attributes = host.attributes.clone();
+            attributes.sort();
+            warn!("{:?}", attributes);
+            for mut sched in schedules {
+                sched.attributes.sort();
+                warn!("{:?}", sched.attributes);
+                if attributes.contains(&sched.attributes()) {
+                    executable_schedules.push(sched);
+                } else {
+                    continue;
+                }
+            }
+
+            if !executable_schedules.is_empty() {
+                info!("For {}: {:?}", host.alias, executable_schedules);
+            }
+            // TODO: Remove hardcoded timer
+            tokio::time::sleep(Duration::new(30, 0)).await;
         }
     });
 
@@ -155,11 +182,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     let _sender_handle = tokio::spawn(async move {
         loop {
             tokio::time::sleep(UPDATE_RATE).await;
-            let arc_host = &*sender_arc_this_host.lock().await;
-            let host = match arc_host {
-                Some(h) => h,
-                None => continue,
-            };
+            let Some(host) = &*sender_arc_this_host.lock().await else { continue };
             let ping_msg = format!("Agent {} you there?", host.alias).into_bytes();
             let _ping = send_message(&sender_arc_sink, Message::Ping(ping_msg)).await;
             // 1. get all executions where start date + timeout + x secs < now

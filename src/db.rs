@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
 use crate::{
-    new_id,
     schedule::{self, Schedule},
     script::{self, Script},
 };
@@ -13,6 +12,10 @@ use sqlx::{
 };
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
+pub fn new_id() -> Uuid {
+    Uuid::new_v4().as_hyphenated().into_uuid()
+}
 
 /// create database
 /// * sqlite::memory: - Open an in-memory database
@@ -38,7 +41,7 @@ pub async fn create_database(connection: &str) -> Result<SqlitePool, sqlx::Error
 /// * hosts table
 /// * scripts table
 /// * executions table
-/// * scheduling table
+/// * schedules table
 /// * sample scripts
 /// * sample schedules
 ///
@@ -47,7 +50,7 @@ pub async fn init_database(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     create_hosts_table(pool.acquire().await?).await?;
     create_scripts_table(pool.acquire().await?).await?;
     create_executions_table(pool.acquire().await?).await?;
-    create_scheduling_table(pool.acquire().await?).await?;
+    create_schedules_table(pool.acquire().await?).await?;
     let tables = query("PRAGMA table_list;")
         .fetch_all(&mut *pool.acquire().await.unwrap())
         .await?;
@@ -57,7 +60,7 @@ pub async fn init_database(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     if script_count == 0 && schedule_count == 0 {
         init_samples(pool).await
     } else {
-        debug!("DB init: script table or scheduling table has data, samples not loaded");
+        debug!("DB init: script table or schedules table has data, samples not loaded");
     }
     Ok(())
 }
@@ -145,7 +148,7 @@ async fn create_executions_table(
     Ok(())
 }
 
-/// Create Scheduling Table in SQLite Database
+/// Create Schedules Table in SQLite Database
 ///
 /// | Name | Type | Comment
 /// :--- | :--- | :---
@@ -154,12 +157,10 @@ async fn create_executions_table(
 /// | attributes | TEXT | server label to execute on
 /// | cron | TEXT | cron pattern for execution
 /// | active | NUMERIC | boolean
-async fn create_scheduling_table(
-    mut connection: PoolConnection<Sqlite>,
-) -> Result<(), sqlx::Error> {
+async fn create_schedules_table(mut connection: PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
     let _res = query(
         r#"CREATE TABLE IF NOT EXISTS 
-        scheduling(
+        schedules(
             id TEXT PRIMARY KEY NOT NULL,
             script_id TEXT,
             attributes TEXT,

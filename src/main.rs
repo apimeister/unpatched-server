@@ -330,10 +330,6 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     let _ = recv_handle.await;
 }
 
-fn new_id() -> Uuid {
-    Uuid::new_v4().as_hyphenated().into_uuid()
-}
-
 // /// Get ARC to Splitsink and push message onto it
 // /// Will not actually flush any data, needs another send event
 // /// either via .close() or .flush()

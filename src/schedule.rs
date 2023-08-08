@@ -13,7 +13,7 @@ pub struct Schedule {
 }
 
 impl Schedule {
-    /// Insert schedule into Scheduling table
+    /// Insert schedule into Schedules table
     ///
     /// | Name | Type | Comment
     /// :--- | :--- | :---
@@ -25,7 +25,7 @@ impl Schedule {
     #[allow(dead_code)]
     // FIXME: write test and remove dead_code
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        query(r#"INSERT INTO scheduling( id, script_id, attributes, cron, active ) VALUES ( ?, ?, ?, ?, ? )"#)
+        query(r#"INSERT INTO schedules( id, script_id, attributes, cron, active ) VALUES ( ?, ?, ?, ?, ? )"#)
             .bind(serde_json::to_string(&self.id).unwrap())
             .bind(serde_json::to_string(&self.script_id).unwrap())
             .bind(serde_json::to_string(&self.attributes).unwrap())
@@ -40,11 +40,11 @@ impl Schedule {
     }
 }
 
-/// API to get all scripts
+/// API to get all schedules
 pub async fn get_schedules_api(
     State(pool): State<SqlitePool>,
 ) -> (StatusCode, Json<Vec<Schedule>>) {
-    let schedule_vec = get_schedules_from_db(pool.acquire().await.unwrap()).await;
+    let schedule_vec = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
     if schedule_vec.is_empty() {
         (StatusCode::NOT_FOUND, Json(schedule_vec))
     } else {
@@ -52,11 +52,16 @@ pub async fn get_schedules_api(
     }
 }
 
-pub async fn get_schedules_from_db(mut connection: PoolConnection<Sqlite>) -> Vec<Schedule> {
-    let schedules = match query("SELECT * FROM scheduling")
-        .fetch_all(&mut *connection)
-        .await
-    {
+pub async fn get_schedules_from_db(
+    filter: Option<&str>,
+    mut connection: PoolConnection<Sqlite>,
+) -> Vec<Schedule> {
+    let stmt = if let Some(f) = filter {
+        format!("SELECT * FROM schedules WHERE {f}")
+    } else {
+        "SELECT * FROM schedules".into()
+    };
+    let schedules = match query(&stmt).fetch_all(&mut *connection).await {
         Ok(d) => d,
         Err(_) => return Vec::new(),
     };
@@ -77,5 +82,5 @@ pub async fn get_schedules_from_db(mut connection: PoolConnection<Sqlite>) -> Ve
 }
 
 pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx::Error> {
-    crate::db::count_rows("scheduling", connection).await
+    crate::db::count_rows("schedules", connection).await
 }

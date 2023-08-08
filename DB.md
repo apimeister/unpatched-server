@@ -28,7 +28,7 @@
 | script_id | TEXT | uuid
 | output | TEXT |
 
-### scheduling
+### schedules
 
 | id | varchar(36) | uuid
 | script_id | varchar(36) | uuid

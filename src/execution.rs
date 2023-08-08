@@ -69,7 +69,7 @@ pub async fn post_executions_api(
     Json(mut payload): Json<Execution>,
 ) -> StatusCode {
     debug!("{:?}", payload);
-    payload.id = Some(crate::new_id());
+    payload.id = Some(db::new_id());
     let res = payload.insert_into_db(pool.acquire().await.unwrap()).await;
     if res.rows_affected() == 1 {
         StatusCode::CREATED

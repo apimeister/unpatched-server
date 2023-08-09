@@ -32,6 +32,7 @@
 | response | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS.SSS")
 | host_id | TEXT | uuid v4 hyphenated
 | script_id | TEXT | uuid v4 hyphenated
+| sched_id | TEXT | uuid v4 hyphenated
 | output | TEXT | script output
 
 ### schedules

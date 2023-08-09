@@ -23,6 +23,8 @@ use tracing::{debug, error, info, warn};
 use tracing_subscriber::{fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter};
 use uuid::Uuid;
 
+use crate::{db::new_id, execution::Execution};
+
 mod db;
 mod execution;
 mod host;
@@ -152,13 +154,11 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
             )
             .await;
             let mut executable_schedules = Vec::new();
-            let mut attributes = host.attributes.clone();
-            attributes.sort();
-            warn!("{:?}", attributes);
+            let mut host_attributes = host.attributes.clone();
+            host_attributes.sort();
             for mut sched in schedules {
                 sched.attributes.sort();
-                warn!("{:?}", sched.attributes);
-                if attributes.contains(&sched.attributes()) {
+                if host_attributes.contains(&sched.attributes()) {
                     executable_schedules.push(sched);
                 } else {
                     continue;
@@ -168,8 +168,35 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
             if !executable_schedules.is_empty() {
                 info!("For {}: {:?}", host.alias, executable_schedules);
             }
+
+            // one off needs a schedule
+
+            for sched in executable_schedules {
+                // Generate Executions from the schedules
+                let exec_filter = format!("host_id='{}' AND sched_id='{}'", host.id, sched.id);
+                let execs = execution::get_executions_from_db(
+                    Some(&exec_filter),
+                    general_pool.acquire().await.unwrap(),
+                )
+                .await;
+                warn!("{:?}", execs);
+                if execs.is_empty() {
+                    // greenfield, just add a new execution
+                    let exe = Execution {
+                        id: new_id(),
+                        host_id: host.id,
+                        sched_id: sched.id,
+                        script_id: sched.script_id,
+                        ..Default::default()
+                    };
+                    let res = exe.insert_into_db(general_pool.acquire().await.unwrap()).await;
+                    info!("{:?}", res);
+                } else {
+                }
+            }
+
             // TODO: Remove hardcoded timer
-            tokio::time::sleep(Duration::new(30, 0)).await;
+            tokio::time::sleep(Duration::new(10, 0)).await;
         }
     });
 

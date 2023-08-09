@@ -4,42 +4,52 @@
 
 ### scripts
 
-| id | varchar(36) | uuid
-| name | text |
-| version | varchar(5) |
-| output_regex | text |
-| labels | json |
-| timeout | text
-| script_content | text |
+| Name | Type | Comment
+:--- | :--- | :---
+| id | TEXT | uuid v4 hyphenated
+| name | TEXT |
+| version | TEXT |
+| output_regex | TEXT |
+| labels | TEXT | json |
+| timeout | TEXT |
+| script_content | TEXT |
 
 ### hosts
 
-| id | varchar(36) | uuid
-| alias | text |
-| attributes | json |
-| last_pong | bool
+| Name | Type | Comment
+:--- | :--- | :---
+| id | TEXT | uuid v4 hyphenated
+| alias | TEXT |
+| attributes | TEXT | json |
+| last_pong | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS.SSS")
 
 ### executions
 
-| id | TEXT | uuid
+| Name | Type | Comment
+:--- | :--- | :---
+| id | TEXT | uuid v4 hyphenated
 | request | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS.SSS")
 | response | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS.SSS")
-| host_id | TEXT | uuid
-| script_id | TEXT | uuid
-| output | TEXT |
+| host_id | TEXT | uuid v4 hyphenated
+| script_id | TEXT | uuid v4 hyphenated
+| output | TEXT | script output
 
 ### schedules
 
-| id | varchar(36) | uuid
-| script_id | varchar(36) | uuid
-| attributes | json |
-| cron | text |
-| active | bool |
+| Name | Type | Comment
+:--- | :--- | :---
+| id | TEXT | uuid v4 hyphenated
+| script_id | TEXT | uuid v4 hyphenated
+| attributes | TEXT | json |
+| cron | TEXT |
+| active | NUMERIC | bool
 
-### metrics
+### metrics - not implemented yet
 
-| id | varchar(36) | uuid
-| host_id | varchar(36) | uuid
-| name | text |
+| Name | Type | Comment
+:--- | :--- | :---
+| id | TEXT | uuid v4 hyphenated
+| host_id | TEXT | uuid v4 hyphenated
+| name | TEXT |
 | dimensions | json
 | value | double |

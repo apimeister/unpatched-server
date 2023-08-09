@@ -76,6 +76,16 @@ paths:
           description: Successfully created
         '400':
           description: Invalid input
+    delete:
+      tags:
+        - executions
+      summary: Delete all executions from executions table
+      description: Delete all executions from executions table
+      responses:
+        '200':
+          description: Success
+        '403':
+          description: Forbidden
 components:
   schemas:
     Execution:

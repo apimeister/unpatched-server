@@ -1,19 +1,24 @@
 use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolConnection, query, sqlite::SqliteQueryResult, Row, Sqlite, SqlitePool};
-use tracing::debug;
+use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::db;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 pub struct Execution {
-    pub id: Option<Uuid>,
+    #[serde(default = "db::new_id")]
+    pub id: Uuid,
     pub request: String,
-    pub response: Option<String>,
+    #[serde(default = "String::new")]
+    pub response: String,
     pub host_id: Uuid,
     pub script_id: Uuid,
-    pub output: Option<String>,
+    #[serde(default = "db::nil_id")]
+    pub sched_id: Uuid,
+    #[serde(default = "String::new")]
+    pub output: String,
 }
 
 impl Execution {
@@ -26,13 +31,15 @@ impl Execution {
     /// | response | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS.SSS") <-- implemented by another call, always created as NULL
     /// | host_id | TEXT | uuid
     /// | script_id | TEXT | uuid
+    /// | sched_id | TEXT | uuid
     /// | output | TEXT | <-- implemented by another call, always created as NULL
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        query(r#"INSERT INTO executions( id, request, host_id, script_id ) VALUES ( ?, ?, ?, ? )"#)
-            .bind(self.id.unwrap().to_string())
+        query(r#"INSERT INTO executions( id, request, host_id, script_id, sched_id ) VALUES ( ?, ?, ?, ?, ? )"#)
+            .bind(self.id.to_string())
             .bind(self.request)
             .bind(self.host_id.to_string())
             .bind(self.script_id.to_string())
+            .bind(self.sched_id.to_string())
             .execute(&mut *connection)
             .await
             .unwrap()
@@ -66,10 +73,9 @@ pub async fn delete_executions_api(State(pool): State<SqlitePool>) -> StatusCode
 /// API to create a new execution
 pub async fn post_executions_api(
     State(pool): State<SqlitePool>,
-    Json(mut payload): Json<Execution>,
+    Json(payload): Json<Execution>,
 ) -> StatusCode {
-    debug!("{:?}", payload);
-    payload.id = Some(db::new_id());
+    warn!("{:?}", payload);
     let res = payload.insert_into_db(pool.acquire().await.unwrap()).await;
     if res.rows_affected() == 1 {
         StatusCode::CREATED
@@ -96,12 +102,13 @@ pub async fn get_executions_from_db(
 
     for s in executions {
         let execution = Execution {
-            id: Some(s.get::<String, _>("id").parse().unwrap()),
+            id: s.get::<String, _>("id").parse().unwrap(),
             request: s.get::<String, _>("request"),
-            response: db::get_option(&s, "response"),
+            response: s.get::<String, _>("response"),
             host_id: s.get::<String, _>("host_id").parse().unwrap(),
             script_id: s.get::<String, _>("script_id").parse().unwrap(),
-            output: db::get_option(&s, "output"),
+            sched_id: s.get::<String, _>("sched_id").parse().unwrap(),
+            output: s.get::<String, _>("output"),
         };
         execution_vec.push(execution);
     }

@@ -17,6 +17,10 @@ pub fn new_id() -> Uuid {
     Uuid::new_v4().as_hyphenated().into_uuid()
 }
 
+pub fn nil_id() -> Uuid {
+    Uuid::nil().as_hyphenated().into_uuid()
+}
+
 /// create database
 /// * sqlite::memory: - Open an in-memory database
 /// * sqlite:data.db - Open the file data.db in the current directory.
@@ -128,6 +132,7 @@ async fn create_scripts_table(mut connection: PoolConnection<Sqlite>) -> Result<
 /// | response | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS.SSS")
 /// | host_id | TEXT | uuid
 /// | script_id | TEXT | uuid
+/// | sched_id | TEXT | uuid
 /// | output | TEXT |
 async fn create_executions_table(
     mut connection: PoolConnection<Sqlite>,
@@ -140,6 +145,7 @@ async fn create_executions_table(
             response TEXT,
             host_id TEXT,
             script_id TEXT,
+            sched_id TEXT,
             output TEXT
         )"#,
     )

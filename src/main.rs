@@ -217,17 +217,16 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     None => {
                         warn!(
                             "execution {} did not find a script with id {}. Execution Skipped",
-                            exe.id.unwrap(),
-                            exe.script_id
+                            exe.id, exe.script_id
                         );
                         execution::update_timestamp(
-                            exe.id.unwrap(),
+                            exe.id,
                             "response",
                             sender_pool.acquire().await.unwrap(),
                         )
                         .await;
                         execution::update_text_field(
-                            exe.id.unwrap(),
+                            exe.id,
                             "output",
                             "Script not found, execution skipped".into(),
                             sender_pool.acquire().await.unwrap(),
@@ -237,10 +236,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     }
                 };
 
-                let script_exec = ScriptExec {
-                    id: exe.id.unwrap(),
-                    script,
-                };
+                let script_exec = ScriptExec { id: exe.id, script };
                 script_exec_vec.push(script_exec)
             }
             for script_exec in script_exec_vec {

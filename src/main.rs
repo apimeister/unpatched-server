@@ -8,7 +8,7 @@ use axum::{
 };
 use clap::Parser;
 use futures::{sink::SinkExt, stream::StreamExt};
-use futures_util::stream::SplitSink;
+use futures_util::{future::join_all, stream::SplitSink};
 use include_dir::{include_dir, Dir};
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePool;
@@ -141,7 +141,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     // ##################
     let general_pool = pool.clone();
     let general_arc_this_host = Arc::clone(&arc_this_host);
-    let _general_handle = tokio::spawn(async move {
+    let general_handle = tokio::spawn(async move {
         loop {
             // TODO: Implement scheduler for executions
             let Some(host) = &*general_arc_this_host.lock().await else { continue };
@@ -179,7 +179,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     let sender_pool = pool.clone();
     let sender_arc_sink = Arc::clone(&arc_sink);
     let sender_arc_this_host = Arc::clone(&arc_this_host);
-    let _sender_handle = tokio::spawn(async move {
+    let sender_handle = tokio::spawn(async move {
         loop {
             tokio::time::sleep(UPDATE_RATE).await;
             let Some(host) = &*sender_arc_this_host.lock().await else { continue };
@@ -346,7 +346,9 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
         }
     });
 
-    let _ = recv_handle.await;
+    // await all tasks
+    let handle_vec = vec![general_handle, sender_handle, recv_handle];
+    join_all(handle_vec).await;
 }
 
 // /// Get ARC to Splitsink and push message onto it

@@ -10,13 +10,13 @@ pub async fn api_ui() -> impl IntoResponse {
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <link rel="shortcut icon" type="image/png" href="/unpatched.png" />
+      <meta name="description" content="Unpatched Server" />
       <title>Unpatched Server - SwaggerUI</title>
-      <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.0.0-alpha.4/swagger-ui.css" />
+      <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.3.1/swagger-ui.css" />
     </head>
     <body>
     <div id="swagger-ui"></div>
-    <script src="https://unpkg.com/swagger-ui-dist@5.0.0-alpha.4/swagger-ui-bundle.js" crossorigin></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.3.1/swagger-ui-bundle.js" crossorigin></script>
     <script>
       window.onload = () => {
         window.ui = SwaggerUIBundle({

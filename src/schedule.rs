@@ -84,3 +84,12 @@ pub async fn get_schedules_from_db(
 pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx::Error> {
     crate::db::count_rows("schedules", connection).await
 }
+
+pub async fn update_text_field(
+    id: Uuid,
+    column: &str,
+    data: String,
+    connection: PoolConnection<Sqlite>,
+) -> SqliteQueryResult {
+    crate::db::update_text_field(id, column, data, "schedules", connection).await
+}

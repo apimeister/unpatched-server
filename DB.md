@@ -21,18 +21,19 @@
 | id | TEXT | uuid v4 hyphenated
 | alias | TEXT |
 | attributes | TEXT | json |
-| last_pong | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS.SSS")
+| last_pong | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
 
 ### executions
 
 | Name | Type | Comment
 :--- | :--- | :---
 | id | TEXT | uuid v4 hyphenated
-| request | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS.SSS")
-| response | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS.SSS")
+| request | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
+| response | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
 | host_id | TEXT | uuid v4 hyphenated
 | script_id | TEXT | uuid v4 hyphenated
 | sched_id | TEXT | uuid v4 hyphenated
+| created | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
 | output | TEXT | script output
 
 ### schedules

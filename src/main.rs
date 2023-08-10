@@ -10,6 +10,7 @@ use axum::{
     routing::get,
     Error, Router,
 };
+use chrono::prelude::*;
 use clap::Parser;
 use futures::{sink::SinkExt, stream::StreamExt};
 use futures_util::{future::join_all, stream::SplitSink};
@@ -225,8 +226,9 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
             // 3. send script with execution id
             // 4. update execution on return with timestamp
             // FIXME: maybe add retries? and after some show as failed
+            // TODO: Implement skip when multiple execs from history would be executed (should only actually exec the newest one)
             let exec_filter = format!(
-                "request < date('now') 
+                "request < datetime('now')
                 AND response IS NULL 
                 AND host_id='{}'",
                 host.id

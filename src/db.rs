@@ -142,6 +142,7 @@ async fn create_scripts_table(mut connection: PoolConnection<Sqlite>) -> Result<
 /// | host_id | TEXT | uuid
 /// | script_id | TEXT | uuid
 /// | sched_id | TEXT | uuid
+/// | created | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
 /// | output | TEXT |
 async fn create_executions_table(
     mut connection: PoolConnection<Sqlite>,
@@ -155,6 +156,7 @@ async fn create_executions_table(
             host_id TEXT,
             script_id TEXT,
             sched_id TEXT,
+            created TEXT,
             output TEXT
         )"#,
     )

@@ -17,6 +17,8 @@ pub struct Execution {
     pub script_id: Uuid,
     #[serde(default = "db::nil_id")]
     pub sched_id: Uuid,
+    #[serde(default = "Utc::now")]
+    pub created: DateTime<Utc>,
     #[serde(default = "String::new")]
     pub output: String,
 }
@@ -32,9 +34,10 @@ impl Execution {
     /// | host_id | TEXT | uuid
     /// | script_id | TEXT | uuid
     /// | sched_id | TEXT | uuid
+    /// | created | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS") <-- autocreated
     /// | output | TEXT | <-- implemented by another call, always created as NULL
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        query(r#"INSERT INTO executions( id, request, host_id, script_id, sched_id ) VALUES ( ?, ?, ?, ?, ? )"#)
+        query(r#"INSERT INTO executions( id, request, host_id, script_id, sched_id, created ) VALUES ( ?, ?, ?, ?, ?, datetime() )"#)
             .bind(self.id.to_string())
             .bind(utc_to_str(self.request))
             .bind(self.host_id.to_string())
@@ -109,6 +112,7 @@ pub async fn get_executions_from_db(
             host_id: s.get::<String, _>("host_id").parse().unwrap(),
             script_id: s.get::<String, _>("script_id").parse().unwrap(),
             sched_id: s.get::<String, _>("sched_id").parse().unwrap(),
+            created: utc_from_str(&s.get::<String, _>("created")),
             output: s.get::<String, _>("output"),
         };
         execution_vec.push(execution);

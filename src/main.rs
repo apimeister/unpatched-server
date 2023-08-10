@@ -147,7 +147,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
         loop {
             // TODO: Implement scheduler for executions
             let host = {
-                let Some(ref host) = *general_arc_this_host.lock().await else { continue };
+                let Some(ref host) = &*general_arc_this_host.lock().await else { continue };
                 host.clone()
             };
 
@@ -213,7 +213,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
         loop {
             tokio::time::sleep(UPDATE_RATE).await;
             let host = {
-                let Some(ref host) = *general_arc_this_host.lock().await else { continue };
+                let Some(ref host) = &*sender_arc_this_host.lock().await else { continue };
                 host.clone()
             };
             let ping_msg = format!("Agent {} you there?", host.alias).into_bytes();

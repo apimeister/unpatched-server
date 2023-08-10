@@ -57,6 +57,11 @@ struct Args {
 const UPDATE_RATE: Duration = Duration::new(5, 0);
 const SQLITE_DB: &str = "sqlite:monitor_server_internal.sqlite";
 
+enum Trigger {
+    Cron(String),
+    Once(DateTime<Utc>),
+}
+
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
@@ -148,7 +153,9 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     let general_arc_this_host = Arc::clone(&arc_this_host);
     let general_handle = tokio::spawn(async move {
         loop {
-            // TODO: Implement scheduler for executions
+            // TODO: Remove hardcoded timer
+            tokio::time::sleep(Duration::new(10, 0)).await;
+
             let host = {
                 let Some(ref host) = &*general_arc_this_host.lock().await else { continue };
                 host.clone()
@@ -172,7 +179,10 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
             }
 
             if !executable_schedules.is_empty() {
-                info!("For {}: {:?}", host.alias, executable_schedules);
+                info!(
+                    "Found schedules for {}: {:?}",
+                    host.alias, executable_schedules
+                );
             }
 
             // one off needs a schedule
@@ -185,24 +195,67 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     general_pool.acquire().await.unwrap(),
                 )
                 .await;
-                warn!("{:?}", execs);
+                info!("Found executions for {}: {:?}", host.alias, execs);
+                let cron_iter = sched.cron.split_ascii_whitespace();
+                let trigger = match cron_iter.count() {
+                    2 => Trigger::Once(utc_from_str(&sched.cron)),
+                    5 => Trigger::Cron(format!("0 {} *", sched.cron)),
+                    7 => Trigger::Cron(sched.cron.clone()),
+                    _ => {
+                        error!(
+                            "Schedule {}: Cron {} has wrong format needs to be 5 part or 7 part cron. Skipped",
+                            sched.id, sched.cron
+                        );
+                        continue;
+                    }
+                };
+                let triggers: Vec<DateTime<Utc>> = match trigger {
+                    Trigger::Cron(c) => {
+                        let cron_schedule = match c.parse::<cron::Schedule>() {
+                            Ok(cc) => cc,
+                            Err(e) => {
+                                error!(
+                                    "Schedule {}: Cron {c} parsing err. Skipped \n {e}",
+                                    sched.id
+                                );
+                                continue;
+                            }
+                        };
+                        cron_schedule.upcoming(Utc).take(3).collect()
+                    }
+                    Trigger::Once(o) => {
+                        schedule::update_text_field(
+                            sched.id,
+                            "active",
+                            "0".into(),
+                            general_pool.acquire().await.unwrap(),
+                        )
+                        .await;
+                        vec![o]
+                    }
+                };
+
                 if execs.is_empty() {
-                    // greenfield, just add a new execution
-                    let exe = Execution {
-                        id: new_id(),
-                        host_id: host.id,
-                        sched_id: sched.id,
-                        script_id: sched.script_id,
-                        ..Default::default()
-                    };
-                    let res = exe.insert_into_db(general_pool.acquire().await.unwrap()).await;
-                    info!("{:?}", res);
+                    // greenfield, just add three new executions
+                    for datetime in triggers {
+                        let exe = Execution {
+                            id: new_id(),
+                            request: datetime,
+                            host_id: host.id,
+                            sched_id: sched.id,
+                            script_id: sched.script_id,
+                            ..Default::default()
+                        };
+                        let res = exe
+                            .insert_into_db(general_pool.acquire().await.unwrap())
+                            .await;
+                        info!("Created new Execution: {:?}", res);
+                    }
                 } else {
+                    // brownfield, we need to check whats there
+                    // error!("{:?}", execs);
                 }
             }
-
-            // TODO: Remove hardcoded timer
-            tokio::time::sleep(Duration::new(10, 0)).await;
         }
     });
 
@@ -229,7 +282,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
             // TODO: Implement skip when multiple execs from history would be executed (should only actually exec the newest one)
             let exec_filter = format!(
                 "request < datetime('now')
-                AND response IS NULL 
+                AND response IS NULL
                 AND host_id='{}'",
                 host.id
             );

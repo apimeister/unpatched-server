@@ -227,7 +227,12 @@ async fn init_samples(pool: &Pool<Sqlite>) {
         timeout: "5s".into(),
         script_content: r#"sw_vers"#.into(),
     };
-    let v = vec![uptime_linux, os_version_linux, uptime_mac, os_version_mac];
+    let v = vec![
+        uptime_linux.clone(),
+        os_version_linux,
+        uptime_mac,
+        os_version_mac,
+    ];
     for s in v {
         let res = s
             .clone()
@@ -252,7 +257,7 @@ async fn init_samples(pool: &Pool<Sqlite>) {
             id: new_id(),
             script_id: s.id,
             attributes: vec![s.labels[0].clone()],
-            cron: "* * * * *".into(),
+            cron: "0 * * * * * *".into(),
             active: true,
         };
         let sched_res = sched
@@ -272,6 +277,31 @@ async fn init_samples(pool: &Pool<Sqlite>) {
                 s.name, s.version, sched.attributes()
             );
         }
+    }
+    let sched = Schedule {
+        id: new_id(),
+        script_id: uptime_linux.id,
+        attributes: vec![uptime_linux.labels[0].clone()],
+        cron: utc_to_str(Utc::now()),
+        active: true,
+    };
+
+    let sched_res = sched
+        .clone()
+        .insert_into_db(pool.acquire().await.unwrap())
+        .await;
+    if sched_res.rows_affected() > 0 {
+        info!(
+            "DB init: sample one-time schedule for script {} version {} with attributes {} loaded",
+            uptime_linux.name,
+            uptime_linux.version,
+            sched.attributes()
+        );
+    } else {
+        warn!(
+                "DB init: sample one-time schedule for script {} version {} with attributes {} could not be loaded",
+                uptime_linux.name, uptime_linux.version, sched.attributes()
+            );
     }
 }
 

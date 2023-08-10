@@ -2,7 +2,7 @@ use axum::{extract::State, http::StatusCode, Json};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolConnection, query, sqlite::SqliteQueryResult, Row, Sqlite, SqlitePool};
-use tracing::{debug, warn};
+use tracing::debug;
 use uuid::Uuid;
 
 use crate::db::{self, get_option, utc_from_str, utc_to_str};
@@ -78,7 +78,7 @@ pub async fn post_executions_api(
     State(pool): State<SqlitePool>,
     Json(payload): Json<Execution>,
 ) -> StatusCode {
-    warn!("{:?}", payload);
+    debug!("{:?}", payload);
     let res = payload.insert_into_db(pool.acquire().await.unwrap()).await;
     if res.rows_affected() == 1 {
         StatusCode::CREATED

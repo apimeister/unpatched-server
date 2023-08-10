@@ -179,23 +179,24 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
             }
 
             if !executable_schedules.is_empty() {
-                info!(
+                debug!(
                     "Found schedules for {}: {:?}",
                     host.alias, executable_schedules
                 );
             }
 
-            // one off needs a schedule
-
             for sched in executable_schedules {
                 // Generate Executions from the schedules
-                let exec_filter = format!("host_id='{}' AND sched_id='{}'", host.id, sched.id);
+                let exec_filter = format!(
+                    "host_id='{}' AND sched_id='{}' AND request > dateTime('now')",
+                    host.id, sched.id
+                );
                 let execs = execution::get_executions_from_db(
                     Some(&exec_filter),
                     general_pool.acquire().await.unwrap(),
                 )
                 .await;
-                info!("Found executions for {}: {:?}", host.alias, execs);
+                debug!("Found executions for {}: {:?}", host.alias, execs);
                 let cron_iter = sched.cron.split_ascii_whitespace();
                 let trigger = match cron_iter.count() {
                     2 => Trigger::Once(utc_from_str(&sched.cron)),
@@ -203,7 +204,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     7 => Trigger::Cron(sched.cron.clone()),
                     _ => {
                         error!(
-                            "Schedule {}: Cron {} has wrong format needs to be 5 part or 7 part cron. Skipped",
+                            "Schedule {}: Cron {} has wrong format needs to be 5 part or 7 part cron, or a timestamp. Skipped",
                             sched.id, sched.cron
                         );
                         continue;
@@ -221,7 +222,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                                 continue;
                             }
                         };
-                        cron_schedule.upcoming(Utc).take(3).collect()
+                        cron_schedule.upcoming(Utc).take(1).collect()
                     }
                     Trigger::Once(o) => {
                         schedule::update_text_field(
@@ -249,11 +250,8 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                         let res = exe
                             .insert_into_db(general_pool.acquire().await.unwrap())
                             .await;
-                        info!("Created new Execution: {:?}", res);
+                        debug!("Created new Execution: {:?}", res);
                     }
-                } else {
-                    // brownfield, we need to check whats there
-                    // error!("{:?}", execs);
                 }
             }
         }

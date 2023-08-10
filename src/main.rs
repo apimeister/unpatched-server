@@ -146,7 +146,10 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     let general_handle = tokio::spawn(async move {
         loop {
             // TODO: Implement scheduler for executions
-            let Some(host) = &*general_arc_this_host.lock().await else { continue };
+            let host = {
+                let Some(ref host) = *general_arc_this_host.lock().await else { continue };
+                host.clone()
+            };
 
             let schedules = schedule::get_schedules_from_db(
                 Some("active = 1"),
@@ -209,7 +212,10 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     let sender_handle = tokio::spawn(async move {
         loop {
             tokio::time::sleep(UPDATE_RATE).await;
-            let Some(host) = &*sender_arc_this_host.lock().await else { continue };
+            let host = {
+                let Some(ref host) = *general_arc_this_host.lock().await else { continue };
+                host.clone()
+            };
             let ping_msg = format!("Agent {} you there?", host.alias).into_bytes();
             let _ping = send_message(&sender_arc_sink, Message::Ping(ping_msg)).await;
             // 1. get all executions where start date + timeout + x secs < now

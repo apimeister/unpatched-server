@@ -22,6 +22,11 @@ tags:
     externalDocs:
       description: Find out more
       url: https://github.com/apimeister/unpatched-server/blob/main/src/execution.rs
+  - name: hosts
+    description: Everything about hosts
+    externalDocs:
+      description: Find out more
+      url: https://github.com/apimeister/unpatched-server/blob/main/src/host.rs
   - name: schedules
     description: Everything about schedules
     externalDocs:
@@ -32,11 +37,6 @@ tags:
     externalDocs:
       description: Find out more
       url: https://github.com/apimeister/unpatched-server/blob/main/src/script.rs
-  - name: hosts
-    description: Everything about hosts
-    externalDocs:
-      description: Find out more
-      url: https://github.com/apimeister/unpatched-server/blob/main/src/host.rs
 paths:
   /executions:
     get:
@@ -163,7 +163,6 @@ paths:
                   id:
                     type: string
                     format: uuid
-                example: { "id": "38400000-8cf0-11bd-b23e-10b96e4ef00d" }
         '400':
           description: Bad request
   /hosts/{id}:
@@ -329,6 +328,11 @@ paths:
       responses:
         '201':
           description: Script created successfully
+          content:
+            application/json:
+              schema:
+                type: string
+                format: uuid
         '400':
           description: Bad request
   /scripts/{script_id}:

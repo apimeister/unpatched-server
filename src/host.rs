@@ -156,6 +156,16 @@ pub async fn delete_hosts_from_db(
         StatusCode::OK
     }
 }
+#[allow(dead_code)]
+// FIXME: make undead
+pub async fn update_text_field(
+    id: Uuid,
+    column: &str,
+    data: String,
+    connection: PoolConnection<Sqlite>,
+) -> SqliteQueryResult {
+    crate::db::update_text_field(id, column, data, "hosts", connection).await
+}
 
 pub async fn update_timestamp(
     id: Uuid,
@@ -163,4 +173,10 @@ pub async fn update_timestamp(
     connection: PoolConnection<Sqlite>,
 ) -> SqliteQueryResult {
     crate::db::update_timestamp(id, column, "hosts", connection).await
+}
+
+#[allow(dead_code)]
+// FIXME: make undead
+pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx::Error> {
+    crate::db::count_rows("hosts", connection).await
 }

@@ -109,8 +109,17 @@ async fn main() {
                 .with_state(pool.clone()),
         )
         .route(
+            "/api/v1/hosts/:id",
+            get(host::get_one_host_api)
+                .delete(host::delete_one_host_api)
+                .with_state(pool.clone()),
+        )
+        .route(
             "/api/v1/hosts",
-            get(host::get_hosts_api).with_state(pool.clone()),
+            get(host::get_hosts_api)
+                .delete(host::delete_hosts_api)
+                .post(host::post_hosts_api)
+                .with_state(pool.clone()),
         )
         .route(
             "/api/v1/schedules",

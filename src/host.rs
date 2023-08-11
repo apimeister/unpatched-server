@@ -1,6 +1,16 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    Json,
+};
 use serde::{Deserialize, Serialize};
-use sqlx::{pool::PoolConnection, query, sqlite::SqliteQueryResult, Row, Sqlite, SqlitePool};
+use sqlx::{
+    pool::PoolConnection,
+    query,
+    sqlite::{SqliteQueryResult, SqliteRow},
+    Row, Sqlite, SqlitePool,
+};
 use tracing::{debug, error};
 use uuid::Uuid;
 
@@ -56,13 +66,60 @@ impl Host {
     }
 }
 
+impl From<SqliteRow> for Host {
+    fn from(s: SqliteRow) -> Self {
+        Host {
+            id: s.get::<String, _>("id").parse().unwrap(),
+            alias: s.get::<String, _>("alias"),
+            attributes: serde_json::from_str(&s.get::<String, _>("attributes")).unwrap(),
+            ip: s.get::<String, _>("ip"),
+            last_pong: s.get::<String, _>("last_pong"),
+        }
+    }
+}
+
 /// API to get all hosts
-pub async fn get_hosts_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<Vec<Host>>) {
+pub async fn get_hosts_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
     let host_vec = get_hosts_from_db(None, pool.acquire().await.unwrap()).await;
-    if host_vec.is_empty() {
-        (StatusCode::NOT_FOUND, Json(host_vec))
+    Json(host_vec)
+}
+
+/// API to get one host
+pub async fn get_one_host_api(
+    Path(id): Path<Uuid>,
+    State(pool): State<SqlitePool>,
+) -> impl IntoResponse {
+    let filter = format!("id='{id}'",);
+    let host_vec = get_hosts_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
+    Json(host_vec)
+}
+
+/// API to delete all hosts
+pub async fn delete_hosts_api(State(pool): State<SqlitePool>) -> StatusCode {
+    delete_hosts_from_db(None, pool.acquire().await.unwrap()).await
+}
+
+/// API to delete one host
+pub async fn delete_one_host_api(
+    Path(id): Path<Uuid>,
+    State(pool): State<SqlitePool>,
+) -> StatusCode {
+    let filter = format!("id='{id}'",);
+    delete_hosts_from_db(Some(&filter), pool.acquire().await.unwrap()).await
+}
+
+/// API to create a new host
+pub async fn post_hosts_api(
+    State(pool): State<SqlitePool>,
+    Json(payload): Json<Host>,
+) -> (StatusCode, Json<String>) {
+    debug!("{:?}", payload);
+    let id = payload.id.to_string();
+    let res = payload.insert_into_db(pool.acquire().await.unwrap()).await;
+    if res.rows_affected() == 1 {
+        (StatusCode::CREATED, Json(id))
     } else {
-        (StatusCode::OK, Json(host_vec))
+        (StatusCode::BAD_REQUEST, Json("".into()))
     }
 }
 
@@ -80,29 +137,25 @@ pub async fn get_hosts_from_db(
         Err(_) => return Vec::new(),
     };
 
-    let mut host_vec: Vec<Host> = Vec::new();
-
-    for s in hosts {
-        let host = Host {
-            id: s.get::<String, _>("id").parse().unwrap(),
-            alias: s.get::<String, _>("alias"),
-            attributes: serde_json::from_str(&s.get::<String, _>("attributes")).unwrap(),
-            ip: s.get::<String, _>("ip"),
-            last_pong: s.get::<String, _>("last_pong"),
-        };
-        host_vec.push(host);
-    }
-    host_vec
+    hosts.into_iter().map(|s| s.into()).collect()
 }
 
-// pub async fn update_text_field(
-//     id: String,
-//     column: &str,
-//     data: String,
-//     connection: PoolConnection<Sqlite>,
-// ) -> SqliteQueryResult {
-//     crate::db::update_text_field(id, column, data, "hosts", connection).await
-// }
+pub async fn delete_hosts_from_db(
+    filter: Option<&str>,
+    mut connection: PoolConnection<Sqlite>,
+) -> StatusCode {
+    let stmt = if let Some(f) = filter {
+        format!("DELETE FROM hosts WHERE {f}")
+    } else {
+        "DELETE FROM hosts".into()
+    };
+    let res = query(&stmt).execute(&mut *connection).await;
+    if res.is_err() {
+        StatusCode::FORBIDDEN
+    } else {
+        StatusCode::OK
+    }
+}
 
 pub async fn update_timestamp(
     id: Uuid,
@@ -111,26 +164,3 @@ pub async fn update_timestamp(
 ) -> SqliteQueryResult {
     crate::db::update_timestamp(id, column, "hosts", connection).await
 }
-// async fn single_agent_api(
-//     Path(id): Path<Uuid>,
-//     State(pool): State<SqlitePool>,
-// ) -> (StatusCode, Json<AgentData>) {
-//     let mut conn = pool.acquire().await.unwrap();
-//     let show_data = match query("SELECT * FROM data WHERE id = ?")
-//         .bind(id.to_string())
-//         .fetch_one(&mut *conn)
-//         .await
-//     {
-//         Ok(d) => d,
-//         Err(_) => return (StatusCode::NOT_FOUND, Json(AgentData::default())),
-//     };
-//     let single_agent = AgentData {
-//         id: show_data.get::<String, _>("id"),
-//         alias: show_data.get::<String, _>("name"),
-//         uptime: show_data.get::<i64, _>("uptime"),
-//         os_release: show_data.get::<String, _>("os_release"),
-//         memory: serde_json::from_str(show_data.get::<String, _>("memory").as_str()).unwrap(),
-//         units: serde_json::from_str(show_data.get::<String, _>("units").as_str()).unwrap(),
-//     };
-//     (StatusCode::OK, Json(single_agent))
-// }

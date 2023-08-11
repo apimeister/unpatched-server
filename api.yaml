@@ -15,34 +15,24 @@ externalDocs:
   description: Find out more about Unpatched Server
   url: https://github.com/apimeister/unpatched-server
 servers:
-- url: http://localhost:3000/api/v1
+- url: /api/v1
 tags:
   - name: executions
-    description: Everything about your executions
+    description: Everything about executions
     externalDocs:
       description: Find out more
-      url: https://github.com/apimeister/unpatched-server
+      url: https://github.com/apimeister/unpatched-server/blob/main/src/execution.rs
   - name: scripts
-    description: Everything about your scripts
+    description: Everything about scripts
     externalDocs:
       description: Find out more
-      url: https://github.com/apimeister/unpatched-server
+      url: https://github.com/apimeister/unpatched-server/blob/main/src/script.rs
+  - name: hosts
+    description: Everything about hosts
+    externalDocs:
+      description: Find out more
+      url: https://github.com/apimeister/unpatched-server/blob/main/src/host.rs
 paths:
-  /hosts:
-    get:
-      summary: Retrieve list of hosts
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Host'
-        '404':
-          description: No hosts found
-
   /executions:
     get:
       tags:
@@ -122,6 +112,94 @@ paths:
           description: execution deleted
         403:
           description: no execution found with this id or cannot be deleted
+  /hosts:
+    get:
+      tags:
+        - hosts
+      summary: Get all hosts
+      responses:
+        '200':
+          description: Successful response containing a list of hosts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Host'
+        '404':
+          description: No hosts found
+    delete:
+      tags:
+        - hosts
+      summary: Delete all hosts
+      responses:
+        '200':
+          description: All hosts deleted successfully
+        '403':
+          description: Forbidden (delete failed)
+    post:
+      tags:
+        - hosts
+      summary: Create a new host
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Host'
+      responses:
+        '201':
+          description: Host created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                example: { "id": "38400000-8cf0-11bd-b23e-10b96e4ef00d" }
+        '400':
+          description: Bad request
+  /hosts/{id}:
+    get:
+      tags:
+        - hosts
+      summary: Get a single host by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the host to retrieve
+      responses:
+        '200':
+          description: Successful response containing the host
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+        '404':
+          description: Host not found
+    delete:
+      tags:
+        - hosts
+      summary: Delete a single host by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the host to delete
+      responses:
+        '200':
+          description: Host deleted successfully
+        '403':
+          description: Forbidden (delete failed)
   /scripts:
     get:
       tags:
@@ -245,12 +323,14 @@ components:
           readOnly: true
         alias:
           type: string
+          example: agent1
         attributes:
           type: array
           items:
             type: string
         ip:
           type: string
+          example: "192.168.0.1:7777"
         last_pong:
           type: string
           format: date-time

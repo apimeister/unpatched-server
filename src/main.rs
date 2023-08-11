@@ -55,7 +55,7 @@ struct Args {
 }
 
 const UPDATE_RATE: Duration = Duration::new(5, 0);
-const SQLITE_DB: &str = "sqlite:monitor_server_internal.sqlite";
+const SQLITE_DB: &str = "sqlite:unpatched_server_internal.sqlite";
 
 enum Trigger {
     Cron(String),

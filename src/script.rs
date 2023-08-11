@@ -1,6 +1,16 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Json,
+};
 use serde::{Deserialize, Serialize};
-use sqlx::{pool::PoolConnection, query, sqlite::SqliteQueryResult, Row, Sqlite, SqlitePool};
+use sqlx::{
+    pool::PoolConnection,
+    query,
+    sqlite::{SqliteQueryResult, SqliteRow},
+    Row, Sqlite, SqlitePool,
+};
+use tracing::debug;
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
@@ -42,6 +52,20 @@ impl Script {
     }
 }
 
+impl From<SqliteRow> for Script {
+    fn from(s: SqliteRow) -> Self {
+        Script {
+            id: s.get::<String, _>("id").parse().unwrap(),
+            name: s.get::<String, _>("name"),
+            version: s.get::<String, _>("version"),
+            output_regex: s.get::<String, _>("output_regex"),
+            labels: serde_json::from_str(&s.get::<String, _>("labels")).unwrap(),
+            timeout: s.get::<String, _>("timeout"),
+            script_content: s.get::<String, _>("script_content"),
+        }
+    }
+}
+
 pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx::Error> {
     crate::db::count_rows("scripts", connection).await
 }
@@ -53,6 +77,64 @@ pub async fn get_scripts_api(State(pool): State<SqlitePool>) -> (StatusCode, Jso
         (StatusCode::NOT_FOUND, Json(script_vec))
     } else {
         (StatusCode::OK, Json(script_vec))
+    }
+}
+
+/// API to get one script
+pub async fn get_one_script_api(
+    Path(id): Path<Uuid>,
+    State(pool): State<SqlitePool>,
+) -> (StatusCode, Json<Script>) {
+    let script = query("SELECT * FROM scripts WHERE id = ?")
+        .bind(id.to_string())
+        .fetch_one(&mut *pool.acquire().await.unwrap())
+        .await;
+    match script {
+        Ok(ex) => (StatusCode::OK, Json(Script::from(ex))),
+        Err(_) => (StatusCode::NOT_FOUND, Json(Script::default())),
+    }
+}
+
+/// API to delete all scripts
+pub async fn delete_scripts_api(State(pool): State<SqlitePool>) -> StatusCode {
+    let scripts = query("DELETE FROM scripts")
+        .execute(&mut *pool.acquire().await.unwrap())
+        .await;
+    if scripts.is_err() {
+        StatusCode::FORBIDDEN
+    } else {
+        StatusCode::OK
+    }
+}
+
+/// API to delete one script
+pub async fn delete_one_script_api(
+    Path(id): Path<Uuid>,
+    State(pool): State<SqlitePool>,
+) -> StatusCode {
+    let script = query("DELETE FROM scripts WHERE id = ?")
+        .bind(id.to_string())
+        .execute(&mut *pool.acquire().await.unwrap())
+        .await;
+    if script.is_err() {
+        StatusCode::FORBIDDEN
+    } else {
+        StatusCode::OK
+    }
+}
+
+/// API to create a new script
+pub async fn post_scripts_api(
+    State(pool): State<SqlitePool>,
+    Json(payload): Json<Script>,
+) -> (StatusCode, Json<String>) {
+    debug!("{:?}", payload);
+    let id = payload.id.to_string();
+    let res = payload.insert_into_db(pool.acquire().await.unwrap()).await;
+    if res.rows_affected() == 1 {
+        (StatusCode::CREATED, Json(id))
+    } else {
+        (StatusCode::BAD_REQUEST, Json("".into()))
     }
 }
 
@@ -70,19 +152,5 @@ pub async fn get_scripts_from_db(
         Err(_) => return Vec::new(),
     };
 
-    let mut script_vec: Vec<Script> = Vec::new();
-
-    for s in scripts {
-        let script = Script {
-            id: s.get::<String, _>("id").parse().unwrap(),
-            name: s.get::<String, _>("name"),
-            version: s.get::<String, _>("version"),
-            output_regex: s.get::<String, _>("output_regex"),
-            labels: serde_json::from_str(&s.get::<String, _>("labels")).unwrap(),
-            timeout: s.get::<String, _>("timeout"),
-            script_content: s.get::<String, _>("script_content"),
-        };
-        script_vec.push(script);
-    }
-    script_vec
+    scripts.into_iter().map(|s| s.into()).collect()
 }

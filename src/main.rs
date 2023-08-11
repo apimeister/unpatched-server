@@ -96,6 +96,19 @@ async fn main() {
                 .post(execution::post_executions_api)
                 .with_state(pool.clone()),
         )
+        .route(
+            "/api/v1/scripts/:id",
+            get(script::get_one_script_api)
+                .delete(script::delete_one_script_api)
+                .with_state(pool.clone()),
+        )
+        .route(
+            "/api/v1/scripts",
+            get(script::get_scripts_api)
+                .delete(script::delete_scripts_api)
+                .post(script::post_scripts_api)
+                .with_state(pool.clone()),
+        )
         .route("/api", get(swagger::api_ui))
         .route("/api/v1", get(swagger::api_ui))
         .route("/api/api.yaml", get(swagger::api_def))

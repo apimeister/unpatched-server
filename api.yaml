@@ -22,6 +22,11 @@ tags:
     externalDocs:
       description: Find out more
       url: https://github.com/apimeister/unpatched-server
+  - name: scripts
+    description: Everything about your scripts
+    externalDocs:
+      description: Find out more
+      url: https://github.com/apimeister/unpatched-server
 paths:
   /agents:
     get:
@@ -122,11 +127,85 @@ paths:
           description: execution deleted
         403:
           description: no execution found with this id or cannot be deleted
+  /scripts:
+    get:
+      tags:
+        - scripts
+      summary: Retrieve list of scripts
       responses:
         '200':
-          description: Success
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Script'
+        '404':
+          description: No scripts found
+    delete:
+      tags:
+        - scripts
+      summary: Delete all scripts
+      responses:
+        '200':
+          description: Scripts deleted successfully
         '403':
-          description: Forbidden
+          description: Forbidden request
+    post:
+      tags:
+        - scripts
+      summary: Create a new script
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Script'
+      responses:
+        '201':
+          description: Script created successfully
+        '400':
+          description: Bad request
+  /scripts/{script_id}:
+    get:
+      tags:
+        - scripts
+      summary: Get a single script by ID
+      parameters:
+        - in: path
+          name: script_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the script to retrieve
+      responses:
+        '200':
+          description: Script retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Script'
+        '404':
+          description: Script not found
+    delete:
+      tags:
+        - scripts
+      summary: Delete a single script by ID
+      parameters:
+        - in: path
+          name: script_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the script to delete
+      responses:
+        '200':
+          description: Script deleted successfully
+        '403':
+          description: Forbidden (delete failed)   
 components:
   schemas:
     Execution:
@@ -164,4 +243,25 @@ components:
           example: hello world
         script_id:
           type: string
-          example: da77836d-1f63-4e30-b753-fe35784af63c
+    Script:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+        version:
+          type: string
+        output_regex:
+          type: string
+          format: regex
+        labels:
+          type: array
+          items:
+            type: string
+        timeout:
+          type: string
+        script_content:
+          type: string

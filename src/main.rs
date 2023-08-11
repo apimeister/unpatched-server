@@ -163,8 +163,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     let general_arc_this_host = Arc::clone(&arc_this_host);
     let general_handle = tokio::spawn(async move {
         loop {
-            // TODO: Remove hardcoded timer
-            tokio::time::sleep(Duration::new(10, 0)).await;
+            tokio::time::sleep(UPDATE_RATE).await;
 
             let host = {
                 let Some(ref host) = &*general_arc_this_host.lock().await else { continue };

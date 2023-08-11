@@ -28,26 +28,21 @@ tags:
       description: Find out more
       url: https://github.com/apimeister/unpatched-server
 paths:
-  /agents:
+  /hosts:
     get:
-      summary: get all agents
+      summary: Retrieve list of hosts
       responses:
-        200:
-          description: all agents
-  /agents/{agent_id}:
-    get:
-      summary: get agent information
-      parameters:
-        - in: path
-          name: agent_id
-          schema:
-            type: string
-            format: uuid v4
-          required: true
-          description: agent id
-      responses:
-        200:
-          description: agent information
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Host'
+        '404':
+          description: No hosts found
+
   /executions:
     get:
       tags:
@@ -241,8 +236,42 @@ components:
           nullable: true
           readOnly: true
           example: hello world
+    Host:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        alias:
+          type: string
+        attributes:
+          type: array
+          items:
+            type: string
+        ip:
+          type: string
+        last_pong:
+          type: string
+          format: date-time
+    Schedule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
         script_id:
           type: string
+          format: uuid
+        attributes:
+          type: array
+          items:
+            type: string
+        cron:
+          type: string
+        active:
+          type: boolean
     Script:
       type: object
       properties:

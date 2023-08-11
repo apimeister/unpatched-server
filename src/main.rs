@@ -82,7 +82,6 @@ async fn main() {
     // build our application with some routes
     let app = Router::new()
         .fallback_service(web_page)
-        .route("/ws", get(ws_handler).with_state(pool.clone()))
         .route(
             "/api/v1/executions/:id",
             get(execution::get_one_execution_api)
@@ -108,6 +107,14 @@ async fn main() {
                 .delete(script::delete_scripts_api)
                 .post(script::post_scripts_api)
                 .with_state(pool.clone()),
+        )
+        .route(
+            "/api/v1/hosts",
+            get(host::get_hosts_api).with_state(pool.clone()),
+        )
+        .route(
+            "/api/v1/schedules",
+            get(schedule::get_schedules_api).with_state(pool.clone()),
         )
         .route("/api", get(swagger::api_ui))
         .route("/api/v1", get(swagger::api_ui))

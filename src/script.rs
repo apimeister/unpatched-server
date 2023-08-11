@@ -1,6 +1,7 @@
 use axum::{
     extract::{Path, State},
     http::StatusCode,
+    response::IntoResponse,
     Json,
 };
 use serde::{Deserialize, Serialize};
@@ -66,68 +67,41 @@ impl From<SqliteRow> for Script {
     }
 }
 
-pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx::Error> {
-    crate::db::count_rows("scripts", connection).await
-}
-
 /// API to get all scripts
-pub async fn get_scripts_api(State(pool): State<SqlitePool>) -> (StatusCode, Json<Vec<Script>>) {
+pub async fn get_scripts_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
     let script_vec = get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
-    if script_vec.is_empty() {
-        (StatusCode::NOT_FOUND, Json(script_vec))
-    } else {
-        (StatusCode::OK, Json(script_vec))
-    }
+    Json(script_vec)
 }
 
 /// API to get one script
 pub async fn get_one_script_api(
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
-) -> (StatusCode, Json<Script>) {
-    let script = query("SELECT * FROM scripts WHERE id = ?")
-        .bind(id.to_string())
-        .fetch_one(&mut *pool.acquire().await.unwrap())
-        .await;
-    match script {
-        Ok(ex) => (StatusCode::OK, Json(Script::from(ex))),
-        Err(_) => (StatusCode::NOT_FOUND, Json(Script::default())),
-    }
+) -> impl IntoResponse {
+    let filter = format!("id='{id}'",);
+    let script_vec = get_scripts_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
+    Json(script_vec)
 }
 
 /// API to delete all scripts
-pub async fn delete_scripts_api(State(pool): State<SqlitePool>) -> StatusCode {
-    let scripts = query("DELETE FROM scripts")
-        .execute(&mut *pool.acquire().await.unwrap())
-        .await;
-    if scripts.is_err() {
-        StatusCode::FORBIDDEN
-    } else {
-        StatusCode::OK
-    }
+pub async fn delete_scripts_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
+    delete_scripts_from_db(None, pool.acquire().await.unwrap()).await
 }
 
 /// API to delete one script
 pub async fn delete_one_script_api(
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
-) -> StatusCode {
-    let script = query("DELETE FROM scripts WHERE id = ?")
-        .bind(id.to_string())
-        .execute(&mut *pool.acquire().await.unwrap())
-        .await;
-    if script.is_err() {
-        StatusCode::FORBIDDEN
-    } else {
-        StatusCode::OK
-    }
+) -> impl IntoResponse {
+    let filter = format!("id='{id}'",);
+    delete_scripts_from_db(Some(&filter), pool.acquire().await.unwrap()).await
 }
 
 /// API to create a new script
 pub async fn post_scripts_api(
     State(pool): State<SqlitePool>,
     Json(payload): Json<Script>,
-) -> (StatusCode, Json<String>) {
+) -> impl IntoResponse {
     debug!("{:?}", payload);
     let id = payload.id.to_string();
     let res = payload.insert_into_db(pool.acquire().await.unwrap()).await;
@@ -153,4 +127,46 @@ pub async fn get_scripts_from_db(
     };
 
     scripts.into_iter().map(|s| s.into()).collect()
+}
+
+pub async fn delete_scripts_from_db(
+    filter: Option<&str>,
+    mut connection: PoolConnection<Sqlite>,
+) -> StatusCode {
+    let stmt = if let Some(f) = filter {
+        format!("DELETE FROM scripts WHERE {f}")
+    } else {
+        "DELETE FROM scripts".into()
+    };
+    let res = query(&stmt).execute(&mut *connection).await;
+    if res.is_err() {
+        StatusCode::FORBIDDEN
+    } else {
+        StatusCode::OK
+    }
+}
+
+#[allow(dead_code)]
+// FIXME: make undead
+pub async fn update_text_field(
+    id: Uuid,
+    column: &str,
+    data: String,
+    connection: PoolConnection<Sqlite>,
+) -> SqliteQueryResult {
+    crate::db::update_text_field(id, column, data, "scripts", connection).await
+}
+
+#[allow(dead_code)]
+// FIXME: make undead
+pub async fn update_timestamp(
+    id: Uuid,
+    column: &str,
+    connection: PoolConnection<Sqlite>,
+) -> SqliteQueryResult {
+    crate::db::update_timestamp(id, column, "scripts", connection).await
+}
+
+pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx::Error> {
+    crate::db::count_rows("scripts", connection).await
 }

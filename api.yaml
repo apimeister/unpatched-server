@@ -22,6 +22,11 @@ tags:
     externalDocs:
       description: Find out more
       url: https://github.com/apimeister/unpatched-server/blob/main/src/execution.rs
+  - name: schedules
+    description: Everything about schedules
+    externalDocs:
+      description: Find out more
+      url: https://github.com/apimeister/unpatched-server/blob/main/src/schedule.rs
   - name: scripts
     description: Everything about scripts
     externalDocs:
@@ -198,6 +203,92 @@ paths:
       responses:
         '200':
           description: Host deleted successfully
+        '403':
+          description: Forbidden (delete failed)
+  /schedules:
+    get:
+      tags:
+        - schedules
+      summary: Get all schedules
+      responses:
+        '200':
+          description: Successful response containing a list of schedules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Schedule'
+        '404':
+          description: No schedules found
+    delete:
+      tags:
+        - schedules
+      summary: Delete all schedules
+      responses:
+        '200':
+          description: All schedules deleted successfully
+        '403':
+          description: Forbidden (delete failed)
+    post:
+      tags:
+        - schedules
+      summary: Create a new schedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Schedule'
+      responses:
+        '201':
+          description: Schedule created successfully
+          content:
+            application/json:
+              schema:
+                type: string
+                format: uuid
+        '400':
+          description: Bad request
+  /schedules/{schedule_id}:
+    get:
+      tags:
+        - schedules
+      summary: Get a single schedule by ID
+      parameters:
+        - in: path
+          name: schedule_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the schedule to retrieve
+      responses:
+        '200':
+          description: Successful response containing a list of schedules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Schedule'
+        '404':
+          description: Host not found
+    delete:
+      tags:
+        - schedules
+      summary: Delete a single schedule by ID
+      parameters:
+        - in: path
+          name: schedule_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the schedule to delete
+      responses:
+        '200':
+          description: Schedule deleted successfully
         '403':
           description: Forbidden (delete failed)
   /scripts:

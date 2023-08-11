@@ -122,8 +122,17 @@ async fn main() {
                 .with_state(pool.clone()),
         )
         .route(
+            "/api/v1/schedules/:id",
+            get(schedule::get_one_schedule_api)
+                .delete(schedule::delete_one_schedule_api)
+                .with_state(pool.clone()),
+        )
+        .route(
             "/api/v1/schedules",
-            get(schedule::get_schedules_api).with_state(pool.clone()),
+            get(schedule::get_schedules_api)
+                .delete(schedule::delete_schedules_api)
+                .post(schedule::post_schedules_api)
+                .with_state(pool.clone()),
         )
         .route("/api", get(swagger::api_ui))
         .route("/api/v1", get(swagger::api_ui))

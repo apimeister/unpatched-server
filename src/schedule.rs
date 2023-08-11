@@ -1,6 +1,17 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    Json,
+};
 use serde::{Deserialize, Serialize};
-use sqlx::{pool::PoolConnection, query, sqlite::SqliteQueryResult, Row, Sqlite, SqlitePool};
+use sqlx::{
+    pool::PoolConnection,
+    query,
+    sqlite::{SqliteQueryResult, SqliteRow},
+    Row, Sqlite, SqlitePool,
+};
+use tracing::debug;
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
@@ -40,15 +51,60 @@ impl Schedule {
     }
 }
 
+impl From<SqliteRow> for Schedule {
+    fn from(s: SqliteRow) -> Self {
+        Schedule {
+            id: s.get::<String, _>("id").parse().unwrap(),
+            script_id: s.get::<String, _>("script_id").parse().unwrap(),
+            attributes: serde_json::from_str(&s.get::<String, _>("attributes")).unwrap(),
+            cron: s.get::<String, _>("cron"),
+            active: s.get::<bool, _>("active"),
+        }
+    }
+}
+
 /// API to get all schedules
-pub async fn get_schedules_api(
-    State(pool): State<SqlitePool>,
-) -> (StatusCode, Json<Vec<Schedule>>) {
+pub async fn get_schedules_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
     let schedule_vec = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
-    if schedule_vec.is_empty() {
-        (StatusCode::NOT_FOUND, Json(schedule_vec))
+    Json(schedule_vec)
+}
+
+/// API to get one schedule
+pub async fn get_one_schedule_api(
+    Path(id): Path<Uuid>,
+    State(pool): State<SqlitePool>,
+) -> impl IntoResponse {
+    let filter = format!("id='{id}'",);
+    let schedule_vec = get_schedules_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
+    Json(schedule_vec)
+}
+
+/// API to delete all schedules
+pub async fn delete_schedules_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
+    delete_schedules_from_db(None, pool.acquire().await.unwrap()).await
+}
+
+/// API to delete one schedule
+pub async fn delete_one_schedule_api(
+    Path(id): Path<Uuid>,
+    State(pool): State<SqlitePool>,
+) -> impl IntoResponse {
+    let filter = format!("id='{id}'",);
+    delete_schedules_from_db(Some(&filter), pool.acquire().await.unwrap()).await
+}
+
+/// API to create a new schedule
+pub async fn post_schedules_api(
+    State(pool): State<SqlitePool>,
+    Json(payload): Json<Schedule>,
+) -> impl IntoResponse {
+    debug!("{:?}", payload);
+    let id = payload.id.to_string();
+    let res = payload.insert_into_db(pool.acquire().await.unwrap()).await;
+    if res.rows_affected() == 1 {
+        (StatusCode::CREATED, Json(id))
     } else {
-        (StatusCode::OK, Json(schedule_vec))
+        (StatusCode::BAD_REQUEST, Json("".into()))
     }
 }
 
@@ -66,23 +122,24 @@ pub async fn get_schedules_from_db(
         Err(_) => return Vec::new(),
     };
 
-    let mut schedule_vec: Vec<Schedule> = Vec::new();
-
-    for s in schedules {
-        let schedule = Schedule {
-            id: s.get::<String, _>("id").parse().unwrap(),
-            script_id: s.get::<String, _>("script_id").parse().unwrap(),
-            attributes: serde_json::from_str(&s.get::<String, _>("attributes")).unwrap(),
-            cron: s.get::<String, _>("cron"),
-            active: s.get::<bool, _>("active"),
-        };
-        schedule_vec.push(schedule);
-    }
-    schedule_vec
+    schedules.into_iter().map(|s| s.into()).collect()
 }
 
-pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx::Error> {
-    crate::db::count_rows("schedules", connection).await
+pub async fn delete_schedules_from_db(
+    filter: Option<&str>,
+    mut connection: PoolConnection<Sqlite>,
+) -> StatusCode {
+    let stmt = if let Some(f) = filter {
+        format!("DELETE FROM schedules WHERE {f}")
+    } else {
+        "DELETE FROM schedules".into()
+    };
+    let res = query(&stmt).execute(&mut *connection).await;
+    if res.is_err() {
+        StatusCode::FORBIDDEN
+    } else {
+        StatusCode::OK
+    }
 }
 
 pub async fn update_text_field(
@@ -92,4 +149,18 @@ pub async fn update_text_field(
     connection: PoolConnection<Sqlite>,
 ) -> SqliteQueryResult {
     crate::db::update_text_field(id, column, data, "schedules", connection).await
+}
+
+#[allow(dead_code)]
+// FIXME: make undead
+pub async fn update_timestamp(
+    id: Uuid,
+    column: &str,
+    connection: PoolConnection<Sqlite>,
+) -> SqliteQueryResult {
+    crate::db::update_timestamp(id, column, "schedules", connection).await
+}
+
+pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx::Error> {
+    crate::db::count_rows("schedules", connection).await
 }

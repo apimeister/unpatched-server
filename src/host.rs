@@ -95,7 +95,7 @@ pub async fn get_one_host_api(
 }
 
 /// API to delete all hosts
-pub async fn delete_hosts_api(State(pool): State<SqlitePool>) -> StatusCode {
+pub async fn delete_hosts_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
     delete_hosts_from_db(None, pool.acquire().await.unwrap()).await
 }
 
@@ -103,7 +103,7 @@ pub async fn delete_hosts_api(State(pool): State<SqlitePool>) -> StatusCode {
 pub async fn delete_one_host_api(
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
-) -> StatusCode {
+) -> impl IntoResponse {
     let filter = format!("id='{id}'",);
     delete_hosts_from_db(Some(&filter), pool.acquire().await.unwrap()).await
 }
@@ -112,7 +112,7 @@ pub async fn delete_one_host_api(
 pub async fn post_hosts_api(
     State(pool): State<SqlitePool>,
     Json(payload): Json<Host>,
-) -> (StatusCode, Json<String>) {
+) -> impl IntoResponse {
     debug!("{:?}", payload);
     let id = payload.id.to_string();
     let res = payload.insert_into_db(pool.acquire().await.unwrap()).await;

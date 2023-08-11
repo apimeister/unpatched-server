@@ -1,6 +1,7 @@
 use axum::{
     extract::{Path, State},
     http::StatusCode,
+    response::IntoResponse,
     Json,
 };
 use chrono::{DateTime, Utc};
@@ -75,65 +76,40 @@ impl From<SqliteRow> for Execution {
 }
 
 /// API to get all executions
-pub async fn get_executions_api(
-    State(pool): State<SqlitePool>,
-) -> (StatusCode, Json<Vec<Execution>>) {
+pub async fn get_executions_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
     let execution_vec = get_executions_from_db(None, pool.acquire().await.unwrap()).await;
-    if execution_vec.is_empty() {
-        (StatusCode::NOT_FOUND, Json(execution_vec))
-    } else {
-        (StatusCode::OK, Json(execution_vec))
-    }
+    Json(execution_vec)
 }
 
 /// API to get one execution
 pub async fn get_one_execution_api(
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
-) -> (StatusCode, Json<Execution>) {
-    let execution = query("SELECT * FROM executions WHERE id = ?")
-        .bind(id.to_string())
-        .fetch_one(&mut *pool.acquire().await.unwrap())
-        .await;
-    match execution {
-        Ok(ex) => (StatusCode::OK, Json(Execution::from(ex))),
-        Err(_) => (StatusCode::NOT_FOUND, Json(Execution::default())),
-    }
+) -> impl IntoResponse {
+    let filter = format!("id='{id}'",);
+    let execution_vec = get_executions_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
+    Json(execution_vec)
 }
 
 /// API to delete all executions
-pub async fn delete_executions_api(State(pool): State<SqlitePool>) -> StatusCode {
-    let executions = query("DELETE FROM executions")
-        .execute(&mut *pool.acquire().await.unwrap())
-        .await;
-    if executions.is_err() {
-        StatusCode::FORBIDDEN
-    } else {
-        StatusCode::OK
-    }
+pub async fn delete_executions_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
+    delete_executions_from_db(None, pool.acquire().await.unwrap()).await
 }
 
 /// API to delete one execution
 pub async fn delete_one_execution_api(
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
-) -> StatusCode {
-    let execution = query("DELETE FROM executions WHERE id = ?")
-        .bind(id.to_string())
-        .execute(&mut *pool.acquire().await.unwrap())
-        .await;
-    if execution.is_err() {
-        StatusCode::FORBIDDEN
-    } else {
-        StatusCode::OK
-    }
+) -> impl IntoResponse {
+    let filter = format!("id='{id}'",);
+    delete_executions_from_db(Some(&filter), pool.acquire().await.unwrap()).await
 }
 
 /// API to create a new execution
 pub async fn post_executions_api(
     State(pool): State<SqlitePool>,
     Json(payload): Json<Execution>,
-) -> (StatusCode, Json<String>) {
+) -> impl IntoResponse {
     debug!("{:?}", payload);
     let id = payload.id.to_string();
     let res = payload.insert_into_db(pool.acquire().await.unwrap()).await;
@@ -159,6 +135,23 @@ pub async fn get_executions_from_db(
     };
 
     executions.into_iter().map(|s| s.into()).collect()
+}
+
+pub async fn delete_executions_from_db(
+    filter: Option<&str>,
+    mut connection: PoolConnection<Sqlite>,
+) -> StatusCode {
+    let stmt = if let Some(f) = filter {
+        format!("DELETE FROM executions WHERE {f}")
+    } else {
+        "DELETE FROM executions".into()
+    };
+    let res = query(&stmt).execute(&mut *connection).await;
+    if res.is_err() {
+        StatusCode::FORBIDDEN
+    } else {
+        StatusCode::OK
+    }
 }
 
 pub async fn update_text_field(

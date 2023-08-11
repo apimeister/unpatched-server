@@ -4,6 +4,7 @@ info:
   version: 1.0.0
   description: |-
     Unpatched Server API
+    * All timestamps are in UTC
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -46,10 +47,10 @@ paths:
     get:
       tags:
         - executions
-      summary: get all executions
+      summary:  Retrieve list of hosts
       responses:
         200:
-          description: all executions
+          description: Successful response
           content:
             application/json:
               schema:
@@ -57,30 +58,70 @@ paths:
                 items:
                   $ref: '#/components/schemas/Execution'
         404:
-          description: Not found
+          description: No executions found
     post:
       tags:
         - executions
-      summary: Add a new execution to the executions table
-      description: Add a new execution to the executions table
-      operationId: addExec
+      summary: Create a new execution
       requestBody:
-        description: Create a new execution in the executions table
+        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/Execution'
-        required: true
       responses:
         '201':
-          description: Successfully created
+          description: Execution created successfully
         '400':
-          description: Invalid input
+          description: Bad request
     delete:
       tags:
         - executions
-      summary: Delete all executions from executions table
-      description: Delete all executions from executions table
+      summary: Delete all executions
+      responses:
+        '200':
+          description: Executions deleted successfully
+        '403':
+          description: Forbidden request
+  /executions/{execution_id}:
+    get:
+      tags:
+        - executions
+      summary: get execution information
+      parameters:
+        - in: path
+          name: execution_id
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: execution id
+      responses:
+        200:
+          description: execution information
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Execution'
+        404:
+          description: no execution found with this id
+    delete:
+      tags:
+        - executions
+      summary: delete execution
+      parameters:
+        - in: path
+          name: execution_id
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: execution id
+      responses:
+        200:
+          description: execution deleted
+        403:
+          description: no execution found with this id or cannot be deleted
       responses:
         '200':
           description: Success
@@ -91,13 +132,36 @@ components:
     Execution:
       type: object
       properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
         request:
           type: string
           format: date-time
-          example: 2023-01-01 23:12:01
+        response:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
         host_id:
           type: string
-          example: da77836d-1f63-4e30-b753-fe35784af63c
+          format: uuid
+        script_id:
+          type: string
+          format: uuid
+        sched_id:
+          type: string
+          format: uuid
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        output:
+          type: string
+          nullable: true
+          readOnly: true
+          example: hello world
         script_id:
           type: string
           example: da77836d-1f63-4e30-b753-fe35784af63c

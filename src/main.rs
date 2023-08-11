@@ -84,21 +84,10 @@ async fn main() {
         .fallback_service(web_page)
         .route("/ws", get(ws_handler).with_state(pool.clone()))
         .route(
-            "/api/v1/scripts",
-            get(script::get_scripts_api).with_state(pool.clone()),
-            // post(script::get_scripts_api).with_state(pool.clone()),
-        )
-        .route(
-            "/api/v1/hosts",
-            get(host::get_hosts_api).with_state(pool.clone()),
-        )
-        // .route(
-        //     "/api/v1/hosts/:id",
-        //     get(single_host_api).with_state(pool.clone()),
-        // )
-        .route(
-            "/api/v1/schedules",
-            get(schedule::get_schedules_api).with_state(pool.clone()),
+            "/api/v1/executions/:id",
+            get(execution::get_one_execution_api)
+                .delete(execution::delete_one_execution_api)
+                .with_state(pool.clone()),
         )
         .route(
             "/api/v1/executions",
@@ -110,6 +99,7 @@ async fn main() {
         .route("/api", get(swagger::api_ui))
         .route("/api/v1", get(swagger::api_ui))
         .route("/api/api.yaml", get(swagger::api_def))
+        .route("/ws", get(ws_handler).with_state(pool.clone()))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),

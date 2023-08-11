@@ -1,7 +1,16 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Json,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{pool::PoolConnection, query, sqlite::SqliteQueryResult, Row, Sqlite, SqlitePool};
+use sqlx::{
+    pool::PoolConnection,
+    query,
+    sqlite::{SqliteQueryResult, SqliteRow},
+    Row, Sqlite, SqlitePool,
+};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -49,6 +58,22 @@ impl Execution {
     }
 }
 
+impl From<SqliteRow> for Execution {
+    fn from(s: SqliteRow) -> Self {
+        let res = get_option(&s, "response");
+        Execution {
+            id: s.get::<String, _>("id").parse().unwrap(),
+            request: utc_from_str(&s.get::<String, _>("request")),
+            response: res.map(|r| utc_from_str(&r)),
+            host_id: s.get::<String, _>("host_id").parse().unwrap(),
+            script_id: s.get::<String, _>("script_id").parse().unwrap(),
+            sched_id: s.get::<String, _>("sched_id").parse().unwrap(),
+            created: utc_from_str(&s.get::<String, _>("created")),
+            output: s.get::<String, _>("output"),
+        }
+    }
+}
+
 /// API to get all executions
 pub async fn get_executions_api(
     State(pool): State<SqlitePool>,
@@ -61,7 +86,22 @@ pub async fn get_executions_api(
     }
 }
 
-/// API to delete an execution
+/// API to get one execution
+pub async fn get_one_execution_api(
+    Path(id): Path<Uuid>,
+    State(pool): State<SqlitePool>,
+) -> (StatusCode, Json<Execution>) {
+    let execution = query("SELECT * FROM executions WHERE id = ?")
+        .bind(id.to_string())
+        .fetch_one(&mut *pool.acquire().await.unwrap())
+        .await;
+    match execution {
+        Ok(ex) => (StatusCode::OK, Json(Execution::from(ex))),
+        Err(_) => (StatusCode::NOT_FOUND, Json(Execution::default())),
+    }
+}
+
+/// API to delete all executions
 pub async fn delete_executions_api(State(pool): State<SqlitePool>) -> StatusCode {
     let executions = query("DELETE FROM executions")
         .execute(&mut *pool.acquire().await.unwrap())
@@ -73,17 +113,34 @@ pub async fn delete_executions_api(State(pool): State<SqlitePool>) -> StatusCode
     }
 }
 
+/// API to delete one execution
+pub async fn delete_one_execution_api(
+    Path(id): Path<Uuid>,
+    State(pool): State<SqlitePool>,
+) -> StatusCode {
+    let execution = query("DELETE FROM executions WHERE id = ?")
+        .bind(id.to_string())
+        .execute(&mut *pool.acquire().await.unwrap())
+        .await;
+    if execution.is_err() {
+        StatusCode::FORBIDDEN
+    } else {
+        StatusCode::OK
+    }
+}
+
 /// API to create a new execution
 pub async fn post_executions_api(
     State(pool): State<SqlitePool>,
     Json(payload): Json<Execution>,
-) -> StatusCode {
+) -> (StatusCode, Json<String>) {
     debug!("{:?}", payload);
+    let id = payload.id.to_string();
     let res = payload.insert_into_db(pool.acquire().await.unwrap()).await;
     if res.rows_affected() == 1 {
-        StatusCode::CREATED
+        (StatusCode::CREATED, Json(id))
     } else {
-        StatusCode::BAD_REQUEST
+        (StatusCode::BAD_REQUEST, Json("".into()))
     }
 }
 
@@ -101,23 +158,7 @@ pub async fn get_executions_from_db(
         Err(_) => return Vec::new(),
     };
 
-    let mut execution_vec: Vec<Execution> = Vec::new();
-
-    for s in executions {
-        let res = get_option(&s, "response");
-        let execution = Execution {
-            id: s.get::<String, _>("id").parse().unwrap(),
-            request: utc_from_str(&s.get::<String, _>("request")),
-            response: res.map(|r| utc_from_str(&r)),
-            host_id: s.get::<String, _>("host_id").parse().unwrap(),
-            script_id: s.get::<String, _>("script_id").parse().unwrap(),
-            sched_id: s.get::<String, _>("sched_id").parse().unwrap(),
-            created: utc_from_str(&s.get::<String, _>("created")),
-            output: s.get::<String, _>("output"),
-        };
-        execution_vec.push(execution);
-    }
-    execution_vec
+    executions.into_iter().map(|s| s.into()).collect()
 }
 
 pub async fn update_text_field(

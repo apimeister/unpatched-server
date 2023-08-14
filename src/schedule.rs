@@ -174,41 +174,59 @@ mod tests {
         let pool = create_database("sqlite::memory:").await.unwrap();
 
         init_database(&pool).await.unwrap();
-        let scheds = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
-        assert_eq!(scheds.len(), 5);
+        let schedules = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(schedules.len(), 5);
 
-        let mut sched = Schedule::default();
-        sched.id = new_id();
-        let _i1 = sched
+        let mut schedule = Schedule::default();
+        schedule.id = new_id();
+        let _i1 = schedule
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
             .await;
-        sched.id = new_id();
-        let _i2 = sched
+        schedule.id = new_id();
+        let _i2 = schedule
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
             .await;
 
-        let scheds = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
-        assert_eq!(scheds.len(), 7);
+        let schedules = count_rows(pool.acquire().await.unwrap()).await.unwrap();
+        assert_eq!(schedules, 7);
+
+        let err_schedules =
+            get_schedules_from_db(Some("this-doesnt-work"), pool.acquire().await.unwrap()).await;
+        assert_eq!(err_schedules.len(), 0);
 
         let _upd = update_text_field(
-            sched.id.clone(),
+            schedule.id.clone(),
             "active",
             "1".to_string(),
             pool.acquire().await.unwrap(),
         )
         .await;
-        let scheds = get_schedules_from_db(
-            Some(format!("id='{}'", sched.id).as_str()),
+        let schedules = get_schedules_from_db(
+            Some(format!("id='{}'", schedule.id).as_str()),
             pool.acquire().await.unwrap(),
         )
         .await;
-        assert_eq!(scheds.len(), 1);
-        assert!(scheds[0].active);
+        assert_eq!(schedules.len(), 1);
+        assert!(schedules[0].active);
 
-        let _del = delete_schedules_from_db(None, pool.acquire().await.unwrap()).await;
-        let scheds = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
-        assert_eq!(scheds.len(), 0);
+        let single_del = delete_schedules_from_db(
+            Some(format!("id='{}'", schedule.id).as_str()),
+            pool.acquire().await.unwrap(),
+        )
+        .await;
+        assert_eq!(single_del, axum::http::StatusCode::OK);
+        let schedules = count_rows(pool.acquire().await.unwrap()).await.unwrap();
+        assert_eq!(schedules, 6);
+
+        let del_fail =
+            delete_schedules_from_db(Some("this-doesnt-work"), pool.acquire().await.unwrap()).await;
+        assert_eq!(del_fail, axum::http::StatusCode::FORBIDDEN);
+
+        let del = delete_schedules_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(del, axum::http::StatusCode::OK);
+        let schedules = count_rows(pool.acquire().await.unwrap()).await.unwrap();
+        assert_eq!(schedules, 0);
     }
 }

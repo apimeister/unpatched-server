@@ -195,8 +195,12 @@ mod tests {
             .insert_into_db(pool.acquire().await.unwrap())
             .await;
 
-        let scripts = get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
-        assert_eq!(scripts.len(), 6);
+        let scripts = count_rows(pool.acquire().await.unwrap()).await.unwrap();
+        assert_eq!(scripts, 6);
+
+        let err_scripts =
+            get_scripts_from_db(Some("this-doesnt-work"), pool.acquire().await.unwrap()).await;
+        assert_eq!(err_scripts.len(), 0);
 
         let _upd = update_text_field(
             script.id.clone(),
@@ -213,8 +217,22 @@ mod tests {
         assert_eq!(scripts.len(), 1);
         assert_eq!(scripts[0].timeout, "100s");
 
-        let _del = delete_scripts_from_db(None, pool.acquire().await.unwrap()).await;
-        let scripts = get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
-        assert_eq!(scripts.len(), 0);
+        let single_del = delete_scripts_from_db(
+            Some(format!("id='{}'", script.id).as_str()),
+            pool.acquire().await.unwrap(),
+        )
+        .await;
+        assert_eq!(single_del, axum::http::StatusCode::OK);
+        let scripts = count_rows(pool.acquire().await.unwrap()).await.unwrap();
+        assert_eq!(scripts, 5);
+
+        let del_fail =
+            delete_scripts_from_db(Some("this-doesnt-work"), pool.acquire().await.unwrap()).await;
+        assert_eq!(del_fail, axum::http::StatusCode::FORBIDDEN);
+
+        let del = delete_scripts_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(del, axum::http::StatusCode::OK);
+        let scripts = count_rows(pool.acquire().await.unwrap()).await.unwrap();
+        assert_eq!(scripts, 0);
     }
 }

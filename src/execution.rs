@@ -164,6 +164,12 @@ pub async fn update_text_field(
     crate::db::update_text_field(id, column, data, "executions", connection).await
 }
 
+#[allow(dead_code)]
+// FIXME: make undead
+pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx::Error> {
+    crate::db::count_rows("executions", connection).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -183,42 +189,61 @@ mod tests {
         let pool = create_database("sqlite::memory:").await.unwrap();
 
         init_database(&pool).await.unwrap();
-        let execs = get_executions_from_db(None, pool.acquire().await.unwrap()).await;
-        assert_eq!(execs.len(), 0);
+        let executions = get_executions_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(executions.len(), 0);
 
-        let mut exe = Execution::default();
-        exe.id = new_id();
-        let _i1 = exe
+        let mut execution = Execution::default();
+        execution.id = new_id();
+        let _i1 = execution
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
             .await;
-        exe.id = new_id();
-        let _i2 = exe
+        execution.id = new_id();
+        let _i2 = execution
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
             .await;
 
-        let execs = get_executions_from_db(None, pool.acquire().await.unwrap()).await;
-        assert_eq!(execs.len(), 2);
+        let executions = count_rows(pool.acquire().await.unwrap()).await.unwrap();
+        assert_eq!(executions, 2);
+
+        let err_executions =
+            get_executions_from_db(Some("this-doesnt-work"), pool.acquire().await.unwrap()).await;
+        assert_eq!(err_executions.len(), 0);
 
         let new_sched_id = new_id();
         let _upd = update_text_field(
-            exe.id.clone(),
+            execution.id.clone(),
             "sched_id",
             new_sched_id.to_string(),
             pool.acquire().await.unwrap(),
         )
         .await;
-        let execs = get_executions_from_db(
-            Some(format!("id='{}'", exe.id).as_str()),
+        let executions = get_executions_from_db(
+            Some(format!("id='{}'", execution.id).as_str()),
             pool.acquire().await.unwrap(),
         )
         .await;
-        assert_eq!(execs.len(), 1);
-        assert_eq!(execs[0].sched_id, new_sched_id);
+        assert_eq!(executions.len(), 1);
+        assert_eq!(executions[0].sched_id, new_sched_id);
 
-        let _del = delete_executions_from_db(None, pool.acquire().await.unwrap()).await;
-        let execs = get_executions_from_db(None, pool.acquire().await.unwrap()).await;
-        assert_eq!(execs.len(), 0);
+        let single_del = delete_executions_from_db(
+            Some(format!("id='{}'", execution.id).as_str()),
+            pool.acquire().await.unwrap(),
+        )
+        .await;
+        assert_eq!(single_del, axum::http::StatusCode::OK);
+        let executions = count_rows(pool.acquire().await.unwrap()).await.unwrap();
+        assert_eq!(executions, 1);
+
+        let del_fail =
+            delete_executions_from_db(Some("this-doesnt-work"), pool.acquire().await.unwrap())
+                .await;
+        assert_eq!(del_fail, axum::http::StatusCode::FORBIDDEN);
+
+        let del = delete_executions_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(del, axum::http::StatusCode::OK);
+        let executions = count_rows(pool.acquire().await.unwrap()).await.unwrap();
+        assert_eq!(executions, 0);
     }
 }

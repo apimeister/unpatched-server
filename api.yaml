@@ -429,6 +429,7 @@ components:
         last_pong:
           type: string
           format: date-time
+          readOnly: true
     Schedule:
       type: object
       properties:

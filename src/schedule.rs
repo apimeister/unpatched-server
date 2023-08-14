@@ -229,4 +229,53 @@ mod tests {
         let schedules = count_rows(pool.acquire().await.unwrap()).await.unwrap();
         assert_eq!(schedules, 0);
     }
+
+    #[tokio::test]
+    async fn test_apis() {
+        registry()
+            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
+            .with(fmt::layer())
+            .try_init()
+            .unwrap_or(());
+
+        let pool = create_database("sqlite::memory:").await.unwrap();
+
+        init_database(&pool).await.unwrap();
+        let mut new_schedule = Schedule::default();
+
+        new_schedule.id = new_id();
+        let api_post = post_schedules_api(
+            axum::extract::State(pool.clone()),
+            Json(new_schedule.clone()),
+        )
+        .await
+        .into_response();
+        assert_eq!(api_post.status(), axum::http::StatusCode::CREATED);
+
+        let api_get_all = get_schedules_api(axum::extract::State(pool.clone()))
+            .await
+            .into_response();
+        assert_eq!(api_get_all.status(), axum::http::StatusCode::OK);
+
+        let api_get_one = get_one_schedule_api(
+            axum::extract::Path(new_schedule.id),
+            axum::extract::State(pool.clone()),
+        )
+        .await
+        .into_response();
+        assert_eq!(api_get_one.status(), axum::http::StatusCode::OK);
+
+        let api_del_one = delete_one_schedule_api(
+            axum::extract::Path(new_schedule.id),
+            axum::extract::State(pool.clone()),
+        )
+        .await
+        .into_response();
+        assert_eq!(api_del_one.status(), axum::http::StatusCode::OK);
+
+        let api_del_all = delete_schedules_api(axum::extract::State(pool.clone()))
+            .await
+            .into_response();
+        assert_eq!(api_del_all.status(), axum::http::StatusCode::OK);
+    }
 }

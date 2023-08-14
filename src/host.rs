@@ -236,4 +236,50 @@ mod tests {
         let hosts = count_rows(pool.acquire().await.unwrap()).await.unwrap();
         assert_eq!(hosts, 0);
     }
+
+    #[tokio::test]
+    async fn test_apis() {
+        registry()
+            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
+            .with(fmt::layer())
+            .try_init()
+            .unwrap_or(());
+
+        let pool = create_database("sqlite::memory:").await.unwrap();
+
+        init_database(&pool).await.unwrap();
+        let mut new_host = Host::default();
+
+        new_host.id = new_id();
+        let api_post = post_hosts_api(axum::extract::State(pool.clone()), Json(new_host.clone()))
+            .await
+            .into_response();
+        assert_eq!(api_post.status(), axum::http::StatusCode::CREATED);
+
+        let api_get_all = get_hosts_api(axum::extract::State(pool.clone()))
+            .await
+            .into_response();
+        assert_eq!(api_get_all.status(), axum::http::StatusCode::OK);
+
+        let api_get_one = get_one_host_api(
+            axum::extract::Path(new_host.id),
+            axum::extract::State(pool.clone()),
+        )
+        .await
+        .into_response();
+        assert_eq!(api_get_one.status(), axum::http::StatusCode::OK);
+
+        let api_del_one = delete_one_host_api(
+            axum::extract::Path(new_host.id),
+            axum::extract::State(pool.clone()),
+        )
+        .await
+        .into_response();
+        assert_eq!(api_del_one.status(), axum::http::StatusCode::OK);
+
+        let api_del_all = delete_hosts_api(axum::extract::State(pool.clone()))
+            .await
+            .into_response();
+        assert_eq!(api_del_all.status(), axum::http::StatusCode::OK);
+    }
 }

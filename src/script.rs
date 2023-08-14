@@ -176,7 +176,7 @@ mod tests {
             .with(fmt::layer())
             .try_init()
             .unwrap_or(());
-        
+
         let pool = create_database("sqlite::memory:").await.unwrap();
 
         init_database(&pool).await.unwrap();

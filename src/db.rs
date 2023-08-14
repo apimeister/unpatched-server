@@ -348,6 +348,7 @@ pub fn get_option(row: &SqliteRow, column: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use tracing_subscriber::{
         fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
@@ -372,5 +373,63 @@ mod tests {
 
         // run again to check already-present branch
         init_database(&pool).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_update_text_field_error() {
+        registry()
+            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
+            .with(fmt::layer())
+            .try_init()
+            .unwrap_or(());
+
+        let pool = create_database("sqlite::memory:").await.unwrap();
+        init_database(&pool).await.unwrap();
+
+        let up = update_text_field(
+            new_id(),
+            "fail-test",
+            "fail-test".into(),
+            "unknown",
+            pool.acquire().await.unwrap(),
+        )
+        .await;
+        assert_eq!(
+            up.last_insert_rowid(),
+            SqliteQueryResult::default().last_insert_rowid()
+        );
+        assert_eq!(
+            up.rows_affected(),
+            SqliteQueryResult::default().rows_affected()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_init_samples() {
+        registry()
+            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
+            .with(fmt::layer())
+            .try_init()
+            .unwrap_or(());
+
+        let pool = create_database("sqlite::memory:").await.unwrap();
+        init_database(&pool).await.unwrap();
+
+        let scripts = script::get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
+        let schedules = schedule::get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(scripts.len(), 4);
+        assert_eq!(schedules.len(), 5);
+
+        // run again to tests already-present branch
+        init_samples(&pool).await;
+        let scripts = script::get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
+        let schedules = schedule::get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(scripts.len(), 8);
+        assert_eq!(schedules.len(), 10);
+    }
+
+    #[tokio::test]
+    async fn test_nil_id() {
+        assert_eq!(nil_id().to_string(), "00000000-0000-0000-0000-000000000000");
     }
 }

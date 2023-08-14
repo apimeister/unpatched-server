@@ -172,3 +172,61 @@ pub async fn update_text_field(
 pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx::Error> {
     crate::db::count_rows("hosts", connection).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::{create_database, init_database, new_id};
+    use tracing_subscriber::{
+        fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
+    };
+
+    #[tokio::test]
+    async fn test_hosts() {
+        registry()
+            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
+            .with(fmt::layer())
+            .try_init()
+            .unwrap_or(());
+        
+        let pool = create_database("sqlite::memory:").await.unwrap();
+
+        init_database(&pool).await.unwrap();
+        let hosts = get_hosts_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(hosts.len(), 0);
+
+        let mut host = Host::default();
+        host.id = new_id();
+        let _i1 = host
+            .clone()
+            .insert_into_db(pool.acquire().await.unwrap())
+            .await;
+        host.id = new_id();
+        let _i2 = host
+            .clone()
+            .insert_into_db(pool.acquire().await.unwrap())
+            .await;
+
+        let hosts = get_hosts_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(hosts.len(), 2);
+
+        let _upd = update_text_field(
+            host.id.clone(),
+            "alias",
+            "cargo-test".to_string(),
+            pool.acquire().await.unwrap(),
+        )
+        .await;
+        let hosts = get_hosts_from_db(
+            Some(format!("id='{}'", host.id).as_str()),
+            pool.acquire().await.unwrap(),
+        )
+        .await;
+        assert_eq!(hosts.len(), 1);
+        assert_eq!(hosts[0].alias, "cargo-test");
+
+        let _del = delete_hosts_from_db(None, pool.acquire().await.unwrap()).await;
+        let hosts = get_hosts_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(hosts.len(), 0);
+    }
+}

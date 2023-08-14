@@ -160,3 +160,61 @@ pub async fn update_text_field(
 pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx::Error> {
     crate::db::count_rows("scripts", connection).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::{create_database, init_database, new_id};
+    use tracing_subscriber::{
+        fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
+    };
+
+    #[tokio::test]
+    async fn test_scripts() {
+        registry()
+            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
+            .with(fmt::layer())
+            .try_init()
+            .unwrap_or(());
+        
+        let pool = create_database("sqlite::memory:").await.unwrap();
+
+        init_database(&pool).await.unwrap();
+        let scripts = get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(scripts.len(), 4);
+
+        let mut script = Script::default();
+        script.id = new_id();
+        let _i1 = script
+            .clone()
+            .insert_into_db(pool.acquire().await.unwrap())
+            .await;
+        script.id = new_id();
+        let _i2 = script
+            .clone()
+            .insert_into_db(pool.acquire().await.unwrap())
+            .await;
+
+        let scripts = get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(scripts.len(), 6);
+
+        let _upd = update_text_field(
+            script.id.clone(),
+            "timeout",
+            "100s".to_string(),
+            pool.acquire().await.unwrap(),
+        )
+        .await;
+        let scripts = get_scripts_from_db(
+            Some(format!("id='{}'", script.id).as_str()),
+            pool.acquire().await.unwrap(),
+        )
+        .await;
+        assert_eq!(scripts.len(), 1);
+        assert_eq!(scripts[0].timeout, "100s");
+
+        let _del = delete_scripts_from_db(None, pool.acquire().await.unwrap()).await;
+        let scripts = get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(scripts.len(), 0);
+    }
+}

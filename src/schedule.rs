@@ -154,3 +154,61 @@ pub async fn update_text_field(
 pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx::Error> {
     crate::db::count_rows("schedules", connection).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::{create_database, init_database, new_id};
+    use tracing_subscriber::{
+        fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
+    };
+
+    #[tokio::test]
+    async fn test_schedules() {
+        registry()
+            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
+            .with(fmt::layer())
+            .try_init()
+            .unwrap_or(());
+        
+        let pool = create_database("sqlite::memory:").await.unwrap();
+
+        init_database(&pool).await.unwrap();
+        let scheds = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(scheds.len(), 5);
+
+        let mut sched = Schedule::default();
+        sched.id = new_id();
+        let _i1 = sched
+            .clone()
+            .insert_into_db(pool.acquire().await.unwrap())
+            .await;
+        sched.id = new_id();
+        let _i2 = sched
+            .clone()
+            .insert_into_db(pool.acquire().await.unwrap())
+            .await;
+
+        let scheds = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(scheds.len(), 7);
+
+        let _upd = update_text_field(
+            sched.id.clone(),
+            "active",
+            "1".to_string(),
+            pool.acquire().await.unwrap(),
+        )
+        .await;
+        let scheds = get_schedules_from_db(
+            Some(format!("id='{}'", sched.id).as_str()),
+            pool.acquire().await.unwrap(),
+        )
+        .await;
+        assert_eq!(scheds.len(), 1);
+        assert!(scheds[0].active);
+
+        let _del = delete_schedules_from_db(None, pool.acquire().await.unwrap()).await;
+        let scheds = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(scheds.len(), 0);
+    }
+}

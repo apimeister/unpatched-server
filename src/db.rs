@@ -358,15 +358,18 @@ mod tests {
         registry()
             .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
             .with(fmt::layer())
-            .init();
+            .try_init()
+            .unwrap_or(());
+        
         let pool = create_database("sqlite::memory:").await.unwrap();
         init_database(&pool).await.unwrap();
-        // let x = query("SELECT count(id) as id FROM scripts")
+        
         let tables = query("PRAGMA table_list;")
             .fetch_all(&mut *pool.acquire().await.unwrap())
             .await
             .unwrap();
         assert_eq!(tables.len(), 6);
+
         // run again to check already-present branch
         init_database(&pool).await.unwrap();
     }

@@ -163,3 +163,62 @@ pub async fn update_text_field(
 ) -> SqliteQueryResult {
     crate::db::update_text_field(id, column, data, "executions", connection).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::{create_database, init_database, new_id};
+    use tracing_subscriber::{
+        fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
+    };
+
+    #[tokio::test]
+    async fn test_executions() {
+        registry()
+            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
+            .with(fmt::layer())
+            .try_init()
+            .unwrap_or(());
+        
+        let pool = create_database("sqlite::memory:").await.unwrap();
+
+        init_database(&pool).await.unwrap();
+        let execs = get_executions_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(execs.len(), 0);
+
+        let mut exe = Execution::default();
+        exe.id = new_id();
+        let _i1 = exe
+            .clone()
+            .insert_into_db(pool.acquire().await.unwrap())
+            .await;
+        exe.id = new_id();
+        let _i2 = exe
+            .clone()
+            .insert_into_db(pool.acquire().await.unwrap())
+            .await;
+
+        let execs = get_executions_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(execs.len(), 2);
+
+        let new_sched_id = new_id();
+        let _upd = update_text_field(
+            exe.id.clone(),
+            "sched_id",
+            new_sched_id.to_string(),
+            pool.acquire().await.unwrap(),
+        )
+        .await;
+        let execs = get_executions_from_db(
+            Some(format!("id='{}'", exe.id).as_str()),
+            pool.acquire().await.unwrap(),
+        )
+        .await;
+        assert_eq!(execs.len(), 1);
+        assert_eq!(execs[0].sched_id, new_sched_id);
+
+        let _del = delete_executions_from_db(None, pool.acquire().await.unwrap()).await;
+        let execs = get_executions_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(execs.len(), 0);
+    }
+}

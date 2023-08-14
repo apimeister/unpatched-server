@@ -43,3 +43,21 @@ pub async fn api_def() -> impl IntoResponse {
     );
     (StatusCode::OK, headers, spec)
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_api_def() {
+        let api_def = api_def().await.into_response();
+        assert_eq!(api_def.status(), axum::http::StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_api_ui() {
+        let api_ui = api_ui().await.into_response();
+        assert_eq!(api_ui.status(), axum::http::StatusCode::OK);
+    }
+}

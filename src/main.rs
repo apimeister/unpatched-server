@@ -1,5 +1,5 @@
 use crate::{
-    db::{new_id, utc_from_str},
+    db::{new_id, utc_from_str, utc_to_str},
     execution::Execution,
 };
 use axum::{
@@ -334,9 +334,10 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                             "execution {} did not find a script with id {}. Execution Skipped",
                             exe.id, exe.script_id
                         );
-                        execution::update_timestamp(
+                        execution::update_text_field(
                             exe.id,
                             "response",
+                            utc_to_str(Utc::now()),
                             sender_pool.acquire().await.unwrap(),
                         )
                         .await;
@@ -406,9 +407,10 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                             "Update agent {} as alive (hosts table -> last pong)!",
                             host.id
                         );
-                        host::update_timestamp(
+                        host::update_text_field(
                             host.id,
                             "last_pong",
+                            utc_to_str(Utc::now()),
                             receiver_pool.acquire().await.unwrap(),
                         )
                         .await;
@@ -432,9 +434,10 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                         "script" => {
                             let script_exec: ScriptExec = serde_json::from_str(v).unwrap();
                             debug!("{:?}", script_exec);
-                            execution::update_timestamp(
+                            execution::update_text_field(
                                 script_exec.id,
                                 "response",
+                                utc_to_str(Utc::now()),
                                 receiver_pool.acquire().await.unwrap(),
                             )
                             .await;

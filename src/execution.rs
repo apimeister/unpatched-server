@@ -53,6 +53,7 @@ impl Execution {
             .bind(self.host_id.to_string())
             .bind(self.script_id.to_string())
             .bind(self.sched_id.to_string())
+            .bind(utc_to_str(self.created))
             .execute(&mut *connection)
             .await
             .unwrap()
@@ -161,12 +162,4 @@ pub async fn update_text_field(
     connection: PoolConnection<Sqlite>,
 ) -> SqliteQueryResult {
     crate::db::update_text_field(id, column, data, "executions", connection).await
-}
-
-pub async fn update_timestamp(
-    id: Uuid,
-    column: &str,
-    connection: PoolConnection<Sqlite>,
-) -> SqliteQueryResult {
-    crate::db::update_timestamp(id, column, "executions", connection).await
 }

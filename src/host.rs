@@ -167,14 +167,6 @@ pub async fn update_text_field(
     crate::db::update_text_field(id, column, data, "hosts", connection).await
 }
 
-pub async fn update_timestamp(
-    id: Uuid,
-    column: &str,
-    connection: PoolConnection<Sqlite>,
-) -> SqliteQueryResult {
-    crate::db::update_timestamp(id, column, "hosts", connection).await
-}
-
 #[allow(dead_code)]
 // FIXME: make undead
 pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx::Error> {

@@ -328,27 +328,6 @@ pub async fn update_text_field(
     }
 }
 
-pub async fn update_timestamp(
-    id: Uuid,
-    column: &str,
-    table: &str,
-    mut connection: PoolConnection<Sqlite>,
-) -> SqliteQueryResult {
-    let stmt = format!("UPDATE {} SET {} = datetime() WHERE id = ?", table, column);
-    match query(&stmt)
-        // extra quotes are needed since uuid.json results in "value" instead of value
-        .bind(id.to_string())
-        .execute(&mut *connection)
-        .await
-    {
-        Ok(q) => q,
-        Err(e) => {
-            error!("Updating {column} for {id} in {table} failed\n{e}");
-            SqliteQueryResult::default()
-        }
-    }
-}
-
 pub async fn count_rows(
     table: &str,
     mut connection: PoolConnection<Sqlite>,

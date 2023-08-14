@@ -11,6 +11,18 @@ title = 'Unpatched Server'
     name = "AGENTS"
     url = "/agents"
     weight = 2
+  [[menu.main]]
+    name = "SCRIPTS"
+    url = "/scripts"
+    weight = 3
+  [[menu.main]]
+    name = "SCHEDULES"
+    url = "/schedules"
+    weight = 4
+  [[menu.main]]
+    name = "EXECUTIONS"
+    url = "/executions"
+    weight = 5
 
 [markup]
   [markup.goldmark]

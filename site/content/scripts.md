@@ -1,23 +1,38 @@
 ---
 title: "scripts"
 ---
-# Scripts
-
-<div id="all"></div>
+<div class="container" id="all"></div>
 <script>
 async function init(){
     let scripts = await fetch('/api/v1/scripts').then(r=>r.json());
     console.log(scripts);
     let s = "";
     for(script of scripts){
-        s += `<div>
-        <div>id: ${script.id}</div>
-        <div>name: ${script.name}</div>
-        <div>version: ${script.version}</div>
-        <div>output_regex: ${script.output_regex}</div>
-        <div>labels: ${script.labels}</div>
-        <div>timeout: ${script.timeout}</div>
-        <div>script_content: ${script.script_content}</div>
+        s += `<div class="container mt-2 mb-2 pt-3 pb-3" style="border: 1px solid var(--bs-secondary);border-radius:1em;">
+        <div class="mb-3">
+            <h5 style="background-color:#efefef;text-align:center;">${script.id}</h5>
+            <h6>version: ${script.version}</h6>
+        </div>
+        <div class="mb-3">
+            <label for="exampleFormControlInput1" class="form-label">Script Name</label>
+            <input type="text" class="form-control" value="${script.name}">
+        </div>
+        <div class="mb-3">
+            <label for="exampleFormControlTextarea1" class="form-label">Example textarea</label>
+            <textarea class="form-control" id="exampleFormControlTextarea1" rows="3">${script.script_content}</textarea>
+        </div>
+        <div class="mb-3">
+            <label for="exampleFormControlInput1" class="form-label">Output Regex</label>
+            <input type="text" class="form-control" value="${script.output_regex}">
+        </div>
+        <div class="mb-3">
+            <label for="exampleFormControlInput1" class="form-label">Labels</label>
+            <input type="text" class="form-control" value="${script.labels}">
+        </div>
+        <div class="mb-3">
+            <label for="exampleFormControlInput1" class="form-label">Timeout in Seconds</label>
+            <input type="text" class="form-control" value="${script.timeout}">
+        </div>
         </div>`;
     }
     document.querySelector("#all").innerHTML=s;

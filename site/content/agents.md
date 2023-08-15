@@ -1,9 +1,7 @@
 ---
 title: "agents"
 ---
-# Agents
-
-<div id="all"></div>
+<div class="container mt-4 mb-4" style="display:flex;" id="all"></div>
 <script>
 function parse_time(inp) {
             const i = inp / 1000
@@ -34,17 +32,22 @@ async function init(){
     let s = "";
     for(agent of agents){
         const time = online(agent.last_pong);
-        s += `
-        <div>
-            <div>Id: ${agent.id}</div>
-            <div>Alias: ${agent.alias}</div>
-            <div>Attributes: ${agent.attributes}</div>
-            <div>Ip: ${agent.ip}</div>
-            <div>
-                <div>Local: ${time.utcDBDate}</div>
-                <div>Utc: ${time.isoDBDate}</div>
-                <div>Elapsed time: ${time.elapsed}</div>
-            </div>
+        let atts="";
+        for(attr of agent.attributes){
+            atts+=`<span class="badge rounded-pill text-bg-secondary me-1 ms-1">${attr}</span>`;
+        }
+        s += `<div class="card ms-2 me-2" style="width:25em;">
+        <div class="card-header">
+            ${agent.alias}
+        </div>
+        <div class="card-body">
+            <div class="card-text">${agent.id}</div>
+            <div class="card-text">${atts}</div>
+        </div>
+        <div class="card-body" style="display: flex;justify-content: space-around;">
+            <a href="#" class="card-link">Run Script</a>
+            <a href="#" class="card-link">Show Executions</a>
+        </div>
         </div>`;
     }
     document.querySelector("#all").innerHTML=s;

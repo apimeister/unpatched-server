@@ -9,3 +9,5 @@
 lcov.info
 .DS_Store
 *.sql
+/self-signed-certs
+*.pem

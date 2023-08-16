@@ -10,6 +10,7 @@ use axum::{
     routing::get,
     Error, Router,
 };
+use axum_server::tls_rustls::RustlsConfig;
 use chrono::prelude::*;
 use clap::Parser;
 use futures::{sink::SinkExt, stream::StreamExt};
@@ -17,7 +18,7 @@ use futures_util::{future::join_all, stream::SplitSink};
 use include_dir::{include_dir, Dir};
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePool;
-use std::time::Duration;
+use std::{io::ErrorKind, path::PathBuf, time::Duration};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 use tower_http::{
@@ -45,13 +46,22 @@ static WEBPAGE: Dir = include_dir!("$CARGO_MANIFEST_DIR/target/site");
 
 type SenderSinkArc = Arc<Mutex<SplitSink<WebSocket, Message>>>;
 
+/// A bash first monitoring solution
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
+    /// bind adress for frontend and agent websockets
     #[arg(short, long, default_value = "127.0.0.1")]
     bind: String,
+    /// bind port for frontend and agent websockets
     #[arg(short, long, default_value = "3000")]
     port: String,
+    /// deactivate tls for frontend
+    #[arg(long)]
+    no_tls: bool,
+    /// Sets the certificate folder
+    #[arg(long, value_name = "FOLDER", default_value = "./self-signed-certs")]
+    cert_folder: PathBuf,
 }
 
 const UPDATE_RATE: Duration = Duration::new(5, 0);
@@ -69,6 +79,7 @@ async fn main() {
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .with(fmt::layer())
         .init();
+
     let pool = db::create_database(SQLITE_DB)
         .await
         .expect("Unable to create database connection!");
@@ -76,6 +87,7 @@ async fn main() {
         .await
         .expect("Unable to initialize database!");
 
+    // Frontend
     let web_page = ServeDir::new(WEBPAGE.path().join("target").join("site"))
         .append_index_html_on_directories(true);
 
@@ -134,21 +146,52 @@ async fn main() {
                 .post(schedule::post_schedules_api)
                 .with_state(pool.clone()),
         )
+        // Swagger API
         .route("/api", get(swagger::api_ui))
         .route("/api/v1", get(swagger::api_ui))
         .route("/api/api.yaml", get(swagger::api_def))
+        // Websocket for Agents
         .route("/ws", get(ws_handler).with_state(pool.clone()))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
         );
-
     let addr: SocketAddr = format!("{}:{}", args.bind, args.port).parse().unwrap();
+
+    // spawn http or https depending on --no-tls
+    if args.no_tls {
+        let _http = tokio::spawn(http_server(app, addr)).await;
+    } else {
+        let _https = tokio::spawn(https_server(app, addr, args.cert_folder)).await;
+    }
+}
+
+async fn http_server(app: Router, addr: SocketAddr) {
     info!("listening on http://{addr}/");
-    axum::Server::bind(&addr)
+    axum_server::bind(addr)
         .serve(app.into_make_service_with_connect_info::<SocketAddr>())
         .await
-        .unwrap();
+        .unwrap()
+}
+
+async fn https_server(app: Router, addr: SocketAddr, tls_folder: PathBuf) {
+    let config =
+    match RustlsConfig::from_pem_file(tls_folder.join("cert.pem"), tls_folder.join("key.pem"))
+        .await
+        {
+            Ok(tls) => tls,
+            Err(e) => {
+                match e.kind() {
+                    ErrorKind::NotFound => panic!("TLS certificates not found under \"self-signed-certs/cert.pem\", \"self-signed-certs/key.pem\""),
+                    _ => panic!("{e}")
+                }
+            }
+        };
+    info!("listening on https://{addr}/");
+    axum_server::bind_rustls(addr, config)
+        .serve(app.into_make_service_with_connect_info::<SocketAddr>())
+        .await
+        .unwrap()
 }
 
 /// The handler for the HTTP request (this gets called when the HTTP GET lands at the start

@@ -38,16 +38,18 @@ impl Script {
     /// | timeout | TEXT | timeout (1s, 5m, 3h etc.)
     /// | script_content | TEXT | original script
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        let q= r#"REPLACE INTO scripts( id, name, version, output_regex, labels, timeout, script_content ) VALUES ( ?, ?, ?, ?, ?, ?, ? )"#;
+        let q = r#"REPLACE INTO scripts( id, name, version, output_regex, labels, timeout, script_content ) VALUES ( ?, ?, ?, ?, ?, ?, ? )"#;
         query(q)
-        .bind(self.id.to_string())
-        .bind(self.name)
-        .bind(self.version)
-        .bind(self.output_regex)
-        .bind(serde_json::to_string(&self.labels).unwrap())
-        .bind(self.timeout)
-        .bind(self.script_content)
-        .execute(&mut *connection).await.unwrap()
+            .bind(self.id.to_string())
+            .bind(self.name)
+            .bind(self.version)
+            .bind(self.output_regex)
+            .bind(serde_json::to_string(&self.labels).unwrap())
+            .bind(self.timeout)
+            .bind(self.script_content)
+            .execute(&mut *connection)
+            .await
+            .unwrap()
     }
     /// return labels as comma-seperated `String`
     pub fn labels(&self) -> String {

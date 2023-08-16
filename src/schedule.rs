@@ -36,7 +36,7 @@ impl Schedule {
     #[allow(dead_code)]
     // FIXME: write test and remove dead_code
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        let q= r#"REPLACE INTO schedules( id, script_id, attributes, cron, active ) VALUES ( ?, ?, ?, ?, ? )"#;
+        let q = r#"REPLACE INTO schedules( id, script_id, attributes, cron, active ) VALUES ( ?, ?, ?, ?, ? )"#;
         query(q)
             .bind(self.id.to_string())
             .bind(self.script_id.to_string())

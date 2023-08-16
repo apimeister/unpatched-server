@@ -27,7 +27,7 @@ pub struct Host {
 }
 
 impl Host {
-    /// Insert Host into hosts table in SQLite database
+    /// Insert into or Replace `Host` in hosts table in SQLite database
     ///
     /// | Name | Type | Comment
     /// :--- | :--- | :---
@@ -37,7 +37,7 @@ impl Host {
     /// | ip | TEXT | host ip:port
     /// | last_pong | TEXT | last checkin from agent
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        let q = r#"REPLACE INTO hosts(id, alias, attributes, ip, last_pong) VALUES(?, ?, ?, ?, ?);"#;
+        let q = r#"REPLACE INTO hosts(id, alias, attributes, ip, last_pong) VALUES(?, ?, ?, ?, ?)"#;
         query(q)
             .bind(&self.id.to_string())
             .bind(self.alias)
@@ -50,6 +50,7 @@ impl Host {
     }
 }
 
+/// Convert `SqliteRow` in `Host` struct
 impl From<SqliteRow> for Host {
     fn from(s: SqliteRow) -> Self {
         Host {

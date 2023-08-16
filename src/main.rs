@@ -176,7 +176,7 @@ async fn http_server(app: Router, addr: SocketAddr) {
 
 async fn https_server(app: Router, addr: SocketAddr, tls_folder: PathBuf) {
     let config =
-    match RustlsConfig::from_pem_file(tls_folder.join("cert.pem"), tls_folder.join("key.pem"))
+    match RustlsConfig::from_pem_file(tls_folder.join("unpatched.server.crt"), tls_folder.join("unpatched.server.key"))
         .await
         {
             Ok(tls) => tls,

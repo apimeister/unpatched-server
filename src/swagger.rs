@@ -4,6 +4,7 @@ use axum::{
 };
 use headers::{HeaderMap, HeaderValue};
 
+/// load swagger gui
 pub async fn api_ui() -> impl IntoResponse {
     let html = r#"<!DOCTYPE html>
     <html lang="en">
@@ -30,6 +31,7 @@ pub async fn api_ui() -> impl IntoResponse {
     (StatusCode::OK, Html(html))
 }
 
+/// load api.yaml
 pub async fn api_def() -> impl IntoResponse {
     let spec = std::fs::read_to_string("api.yaml").unwrap();
     let mut headers = HeaderMap::new();

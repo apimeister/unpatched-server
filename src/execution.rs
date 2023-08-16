@@ -34,7 +34,7 @@ pub struct Execution {
 }
 
 impl Execution {
-    /// Insert execution into Executions table
+    /// Insert into or Replace `Execution` in executions table in SQLite database
     ///
     /// | Name | Type | Comment
     /// :--- | :--- | :---
@@ -44,10 +44,11 @@ impl Execution {
     /// | host_id | TEXT | uuid
     /// | script_id | TEXT | uuid
     /// | sched_id | TEXT | uuid
-    /// | created | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS") <-- autocreated
+    /// | created | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
     /// | output | TEXT | <-- implemented by another call, always created as NULL
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        query(r#"INSERT INTO executions( id, request, host_id, script_id, sched_id, created ) VALUES ( ?, ?, ?, ?, ?, datetime() )"#)
+        let q = r#"REPLACE INTO executions( id, request, host_id, script_id, sched_id, created ) VALUES( ?, ?, ?, ?, ?, ? )"#;
+        query(q)
             .bind(self.id.to_string())
             .bind(utc_to_str(self.request))
             .bind(self.host_id.to_string())

@@ -24,7 +24,7 @@ pub struct Schedule {
 }
 
 impl Schedule {
-    /// Insert schedule into Schedules table
+    /// Insert into or Replace `Schedule` in schedules table in SQLite database
     ///
     /// | Name | Type | Comment
     /// :--- | :--- | :---
@@ -36,7 +36,8 @@ impl Schedule {
     #[allow(dead_code)]
     // FIXME: write test and remove dead_code
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        query(r#"INSERT INTO schedules( id, script_id, attributes, cron, active ) VALUES ( ?, ?, ?, ?, ? )"#)
+        let q = r#"REPLACE INTO schedules( id, script_id, attributes, cron, active ) VALUES ( ?, ?, ?, ?, ? )"#;
+        query(q)
             .bind(self.id.to_string())
             .bind(self.script_id.to_string())
             .bind(serde_json::to_string(&self.attributes).unwrap())
@@ -46,6 +47,8 @@ impl Schedule {
             .await
             .unwrap()
     }
+
+    /// list attributes as comma-seperated `String`
     pub fn attributes(&self) -> String {
         self.attributes.join(",")
     }

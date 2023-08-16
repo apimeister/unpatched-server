@@ -37,14 +37,13 @@ impl Host {
     /// | ip | TEXT | host ip:port
     /// | last_pong | TEXT | last checkin from agent
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        let q = r#"INSERT INTO hosts(alias, attributes, ip, last_pong, id) VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET alias = ?, attributes = ?, ip = ?, last_pong = ? WHERE id = ?"#;
+        let q = r#"REPLACE INTO hosts(id, alias, attributes, ip, last_pong) VALUES(?, ?, ?, ?, ?);"#;
         query(q)
+            .bind(&self.id.to_string())
             .bind(self.alias)
             .bind(serde_json::to_string(&self.attributes).unwrap())
             .bind(self.ip)
             .bind(utc_to_str(Utc::now()))
-            .bind(&self.id.to_string())
             .execute(&mut *connection)
             .await
             .unwrap()

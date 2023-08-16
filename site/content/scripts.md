@@ -36,15 +36,15 @@ async function init(){
         <div class="me-4 ms-4" style="display:flex;justify-content: flex-end;">
             <div class="btn-group">
                 <button class="btn btn-outline-primary" type="button">
-                    save
+                    save as patch version
                 </button>
                 <button type="button" class="btn btn-outline-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
                     <span class="visually-hidden">Toggle Dropdown</span>
                 </button>
                 <ul class="dropdown-menu">
-                    <li>as patch version</li>
-                    <li>as minor version</li>
-                    <li>as major version</li>
+                    <li><a class="dropdown-item" href="#">as patch version</a></li>
+                    <li><a class="dropdown-item" href="#">as minor version</a></li>
+                    <li><a class="dropdown-item" href="#">as major version</a></li>
                 </ul>
             </div>
         </div>

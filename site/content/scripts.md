@@ -33,6 +33,21 @@ async function init(){
             <label for="exampleFormControlInput1" class="form-label">Timeout in Seconds</label>
             <input type="text" class="form-control" value="${script.timeout}">
         </div>
+        <div class="me-4 ms-4" style="display:flex;justify-content: flex-end;">
+            <div class="btn-group">
+                <button class="btn btn-outline-primary" type="button">
+                    save
+                </button>
+                <button type="button" class="btn btn-outline-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li>as patch version</li>
+                    <li>as minor version</li>
+                    <li>as major version</li>
+                </ul>
+            </div>
+        </div>
         </div>`;
     }
     document.querySelector("#all").innerHTML=s;

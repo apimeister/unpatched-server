@@ -7,6 +7,7 @@ authors = ["Alexander Kunde<alexander@apimeister.com>", "Jens Walter<jens@apimei
 
 [dependencies]
 axum = { version = "0.6", features = ["ws"] }
+axum-server = { version = "0.5", features = ["tls-rustls"] }
 chrono = { version = "0.4.26", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
 cron = "0.12.0"

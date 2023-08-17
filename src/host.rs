@@ -76,7 +76,7 @@ pub async fn get_one_host_api(
 ) -> impl IntoResponse {
     let filter = format!("id='{id}'",);
     let host_vec = get_hosts_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
-    Json(host_vec)
+    Json(host_vec.first().cloned())
 }
 
 /// API to delete all hosts

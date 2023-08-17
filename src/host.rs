@@ -180,8 +180,11 @@ mod tests {
         let hosts = get_hosts_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(hosts.len(), 0);
 
-        let mut host = Host::default();
-        host.id = new_id();
+        let mut host = Host {
+            id: new_id(),
+            ..Default::default()
+        };
+
         let _i1 = host
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
@@ -204,7 +207,7 @@ mod tests {
         assert_eq!(err_hosts.len(), 0);
 
         let _upd = update_text_field(
-            host.id.clone(),
+            host.id,
             "alias",
             "cargo-test".to_string(),
             pool.acquire().await.unwrap(),
@@ -248,9 +251,11 @@ mod tests {
         let pool = create_database("sqlite::memory:").await.unwrap();
 
         init_database(&pool).await.unwrap();
-        let mut new_host = Host::default();
+        let new_host = Host {
+            id: new_id(),
+            ..Default::default()
+        };
 
-        new_host.id = new_id();
         let api_post = post_hosts_api(axum::extract::State(pool.clone()), Json(new_host.clone()))
             .await
             .into_response();

@@ -180,8 +180,11 @@ mod tests {
         let schedules = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(schedules.len(), 5);
 
-        let mut schedule = Schedule::default();
-        schedule.id = new_id();
+        let mut schedule = Schedule {
+            id: new_id(),
+            ..Default::default()
+        };
+
         let _i1 = schedule
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
@@ -200,7 +203,7 @@ mod tests {
         assert_eq!(err_schedules.len(), 0);
 
         let _upd = update_text_field(
-            schedule.id.clone(),
+            schedule.id,
             "active",
             "1".to_string(),
             pool.acquire().await.unwrap(),
@@ -244,9 +247,11 @@ mod tests {
         let pool = create_database("sqlite::memory:").await.unwrap();
 
         init_database(&pool).await.unwrap();
-        let mut new_schedule = Schedule::default();
+        let new_schedule = Schedule {
+            id: new_id(),
+            ..Default::default()
+        };
 
-        new_schedule.id = new_id();
         let api_post = post_schedules_api(
             axum::extract::State(pool.clone()),
             Json(new_schedule.clone()),

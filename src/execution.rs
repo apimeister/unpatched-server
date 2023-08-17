@@ -39,12 +39,12 @@ impl Execution {
     /// | Name | Type | Comment
     /// :--- | :--- | :---
     /// | id | TEXT | uuid
-    /// | request | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
-    /// | response | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS") <-- implemented by another call, always created as NULL
+    /// | request | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
+    /// | response | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ") <-- implemented by another call, always created as NULL
     /// | host_id | TEXT | uuid
     /// | script_id | TEXT | uuid
     /// | sched_id | TEXT | uuid
-    /// | created | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
+    /// | created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
     /// | output | TEXT | <-- implemented by another call, always created as NULL
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
         let q = r#"REPLACE INTO executions( id, request, host_id, script_id, sched_id, created ) VALUES( ?, ?, ?, ?, ?, ? )"#;
@@ -54,7 +54,7 @@ impl Execution {
             .bind(self.host_id.to_string())
             .bind(self.script_id.to_string())
             .bind(self.sched_id.to_string())
-            .bind(utc_to_str(self.created))
+            .bind(utc_to_str(Utc::now()))
             .execute(&mut *connection)
             .await
             .unwrap()
@@ -193,8 +193,10 @@ mod tests {
         let executions = get_executions_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(executions.len(), 0);
 
-        let mut execution = Execution::default();
-        execution.id = new_id();
+        let mut execution = Execution {
+            id: new_id(),
+            ..Default::default()
+        };
         let _i1 = execution
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
@@ -214,7 +216,7 @@ mod tests {
 
         let new_sched_id = new_id();
         let _upd = update_text_field(
-            execution.id.clone(),
+            execution.id,
             "sched_id",
             new_sched_id.to_string(),
             pool.acquire().await.unwrap(),
@@ -259,9 +261,11 @@ mod tests {
         let pool = create_database("sqlite::memory:").await.unwrap();
 
         init_database(&pool).await.unwrap();
-        let mut new_execution = Execution::default();
+        let new_execution = Execution {
+            id: new_id(),
+            ..Default::default()
+        };
 
-        new_execution.id = new_id();
         let api_post = post_executions_api(
             axum::extract::State(pool.clone()),
             Json(new_execution.clone()),

@@ -79,7 +79,7 @@ pub async fn get_one_schedule_api(
 ) -> impl IntoResponse {
     let filter = format!("id='{id}'",);
     let schedule_vec = get_schedules_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
-    Json(schedule_vec)
+    Json(schedule_vec.first().cloned())
 }
 
 /// API to delete all schedules

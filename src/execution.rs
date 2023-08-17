@@ -90,7 +90,7 @@ pub async fn get_one_execution_api(
 ) -> impl IntoResponse {
     let filter = format!("id='{id}'",);
     let execution_vec = get_executions_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
-    Json(execution_vec)
+    Json(execution_vec.first().cloned())
 }
 
 /// API to delete all executions

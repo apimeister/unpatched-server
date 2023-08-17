@@ -84,7 +84,7 @@ pub async fn get_one_script_api(
 ) -> impl IntoResponse {
     let filter = format!("id='{id}'",);
     let script_vec = get_scripts_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
-    Json(script_vec)
+    Json(script_vec.first().cloned())
 }
 
 /// API to delete all scripts

@@ -187,8 +187,7 @@ mod tests {
         let scripts = get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(scripts.len(), 4);
 
-        let mut script = Script::default();
-        script.id = new_id();
+        let mut script = Script { id: new_id(), ..Default::default() };
         let _i1 = script
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
@@ -207,7 +206,7 @@ mod tests {
         assert_eq!(err_scripts.len(), 0);
 
         let _upd = update_text_field(
-            script.id.clone(),
+            script.id,
             "timeout",
             "100s".to_string(),
             pool.acquire().await.unwrap(),
@@ -251,9 +250,7 @@ mod tests {
         let pool = create_database("sqlite::memory:").await.unwrap();
 
         init_database(&pool).await.unwrap();
-        let mut new_script = Script::default();
-
-        new_script.id = new_id();
+        let new_script = Script { id: new_id(), ..Default::default() };
         let api_post =
             post_scripts_api(axum::extract::State(pool.clone()), Json(new_script.clone()))
                 .await

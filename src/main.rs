@@ -257,8 +257,9 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
 
             for sched in executable_schedules {
                 // Generate Executions from the schedules
+                let now = utc_to_str(Utc::now());
                 let exec_filter = format!(
-                    "host_id='{}' AND sched_id='{}' AND request > dateTime('now')",
+                    "host_id='{}' AND sched_id='{}' AND request > '{now}'",
                     host.id, sched.id
                 );
                 let execs = execution::get_executions_from_db(
@@ -266,10 +267,10 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     general_pool.acquire().await.unwrap(),
                 )
                 .await;
-                debug!("Found executions for {}: {:?}", host.alias, execs);
+                debug!("Found executions for {}: {execs:?}", host.alias);
                 let cron_iter = sched.cron.split_ascii_whitespace();
                 let trigger = match cron_iter.count() {
-                    2 => Trigger::Once(utc_from_str(&sched.cron)),
+                    1 => Trigger::Once(utc_from_str(&sched.cron)),
                     5 => Trigger::Cron(format!("0 {} *", sched.cron)),
                     7 => Trigger::Cron(sched.cron.clone()),
                     _ => {
@@ -307,7 +308,6 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                 };
 
                 if execs.is_empty() {
-                    // greenfield, just add three new executions
                     for datetime in triggers {
                         let exe = Execution {
                             id: new_id(),
@@ -348,8 +348,9 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
             // 4. update execution on return with timestamp
             // FIXME: maybe add retries? and after some show as failed
             // TODO: Implement skip when multiple execs from history would be executed (should only actually exec the newest one)
+            let now = utc_to_str(Utc::now());
             let exec_filter = format!(
-                "request < datetime('now')
+                "request < '{now}'
                 AND response IS NULL
                 AND host_id='{}'",
                 host.id

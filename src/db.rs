@@ -4,7 +4,7 @@ use crate::{
     schedule::{self, Schedule},
     script::{self, Script},
 };
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use sqlx::{
     pool::PoolConnection,
     query,
@@ -23,11 +23,11 @@ pub fn nil_id() -> Uuid {
 }
 
 pub fn utc_from_str(s: &str) -> DateTime<Utc> {
-    Utc.datetime_from_str(s, "%Y-%m-%d %H:%M:%S").unwrap()
+    DateTime::parse_from_rfc3339(s).unwrap().into()
 }
 
 pub fn utc_to_str(s: DateTime<Utc>) -> String {
-    format!("{}", s.format("%Y-%m-%d %H:%M:%S"))
+    s.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }
 
 /// create database
@@ -137,12 +137,12 @@ async fn create_scripts_table(mut connection: PoolConnection<Sqlite>) -> Result<
 /// | Name | Type | Comment
 /// :--- | :--- | :---
 /// | id | TEXT | uuid
-/// | request | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
-/// | response | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
+/// | request | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
+/// | response | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 /// | host_id | TEXT | uuid
 /// | script_id | TEXT | uuid
 /// | sched_id | TEXT | uuid
-/// | created | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
+/// | created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 /// | output | TEXT |
 async fn create_executions_table(
     mut connection: PoolConnection<Sqlite>,

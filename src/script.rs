@@ -187,7 +187,10 @@ mod tests {
         let scripts = get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(scripts.len(), 4);
 
-        let mut script = Script { id: new_id(), ..Default::default() };
+        let mut script = Script {
+            id: new_id(),
+            ..Default::default()
+        };
         let _i1 = script
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
@@ -250,7 +253,10 @@ mod tests {
         let pool = create_database("sqlite::memory:").await.unwrap();
 
         init_database(&pool).await.unwrap();
-        let new_script = Script { id: new_id(), ..Default::default() };
+        let new_script = Script {
+            id: new_id(),
+            ..Default::default()
+        };
         let api_post =
             post_scripts_api(axum::extract::State(pool.clone()), Json(new_script.clone()))
                 .await

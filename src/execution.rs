@@ -193,7 +193,10 @@ mod tests {
         let executions = get_executions_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(executions.len(), 0);
 
-        let mut execution = Execution { id: new_id(), ..Default::default() };
+        let mut execution = Execution {
+            id: new_id(),
+            ..Default::default()
+        };
         let _i1 = execution
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
@@ -258,7 +261,10 @@ mod tests {
         let pool = create_database("sqlite::memory:").await.unwrap();
 
         init_database(&pool).await.unwrap();
-        let new_execution = Execution { id: new_id(), ..Default::default() };
+        let new_execution = Execution {
+            id: new_id(),
+            ..Default::default()
+        };
 
         let api_post = post_executions_api(
             axum::extract::State(pool.clone()),

@@ -180,7 +180,10 @@ mod tests {
         let hosts = get_hosts_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(hosts.len(), 0);
 
-        let mut host = Host { id: new_id(), ..Default::default() };
+        let mut host = Host {
+            id: new_id(),
+            ..Default::default()
+        };
 
         let _i1 = host
             .clone()
@@ -248,7 +251,10 @@ mod tests {
         let pool = create_database("sqlite::memory:").await.unwrap();
 
         init_database(&pool).await.unwrap();
-        let new_host = Host { id: new_id(), ..Default::default() };
+        let new_host = Host {
+            id: new_id(),
+            ..Default::default()
+        };
 
         let api_post = post_hosts_api(axum::extract::State(pool.clone()), Json(new_host.clone()))
             .await

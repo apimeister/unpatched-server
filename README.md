@@ -7,12 +7,13 @@
 ```shell
 A bash first monitoring solution
 
-Usage: cargo run [-- [--option]]
+Usage: unpatched-server [OPTIONS]
 
 Options:
   -b, --bind <BIND>           bind adress for frontend and agent websockets [default: 127.0.0.1]
   -p, --port <PORT>           bind port for frontend and agent websockets [default: 3000]
       --no-tls                deactivate tls
+      --auto-accept-agents    auto-accept new agents (not working yet)
       --cert-folder <FOLDER>  Sets the certificate folder [default: ./self-signed-certs]
   -h, --help                  Print help
   -V, --version               Print version
@@ -21,8 +22,12 @@ Options:
 ### usage details
 
 1. start server
-2. start [agent](https://github.com/apimeister/monitor-agent) to send data to server
-3. open webgui at server:port - example `127.0.0.1:3000`
+2. open webgui at server:port - example `127.0.0.1:3000`
+3. start [agent](https://github.com/apimeister/monitor-agent) to send data to server
+   - look into server log
+   - copy out agent id
+   - go to `https://your-server.x/api` -> hosts -> approval
+   - past id and execute, your agent is now allowed to send data
 4. refresh to change data
 
 ## TLS

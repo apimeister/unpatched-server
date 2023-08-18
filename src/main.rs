@@ -60,7 +60,7 @@ struct Args {
     /// bind port for frontend and agent websockets
     #[arg(short, long, default_value = "3000")]
     port: String,
-    /// deactivate tls for frontend
+    /// deactivate tls
     #[arg(long)]
     no_tls: bool,
     /// auto-accept new agents
@@ -220,7 +220,13 @@ async fn ws_handler(
 ) -> impl IntoResponse {
     // use Websocket
     // TODO: Add api-key-logic of seeding keys to agent_id as well
-    let go_on = agent_auth(headers, &addr, pool.clone()).await;
+    // remove hardcode
+    let auto_accept_agents = false;
+    let go_on = if auto_accept_agents {
+        Some(Uuid::nil())
+    } else {
+        agent_auth(headers, &addr, pool.clone()).await
+    };
     if let Some(key) = go_on {
         // authenticated agent
         if key.is_nil() {

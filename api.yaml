@@ -76,14 +76,14 @@ paths:
           description: Executions deleted successfully
         '403':
           description: Forbidden request
-  /executions/{execution_id}:
+  /executions/{id}:
     get:
       tags:
         - executions
       summary: get execution information
       parameters:
         - in: path
-          name: execution_id
+          name: id
           schema:
             type: string
             format: uuid
@@ -102,7 +102,7 @@ paths:
       summary: delete execution
       parameters:
         - in: path
-          name: execution_id
+          name: id
           schema:
             type: string
             format: uuid
@@ -239,14 +239,14 @@ paths:
                 format: uuid
         '400':
           description: Bad request
-  /schedules/{schedule_id}:
+  /schedules/{id}:
     get:
       tags:
         - schedules
       summary: Get a single schedule by ID
       parameters:
         - in: path
-          name: schedule_id
+          name: id
           required: true
           schema:
             type: string
@@ -265,7 +265,7 @@ paths:
       summary: Delete a single schedule by ID
       parameters:
         - in: path
-          name: schedule_id
+          name: id
           required: true
           schema:
             type: string
@@ -319,14 +319,14 @@ paths:
                 format: uuid
         '400':
           description: Bad request
-  /scripts/{script_id}:
+  /scripts/{id}:
     get:
       tags:
         - scripts
       summary: Get a single script by ID
       parameters:
         - in: path
-          name: script_id
+          name: id
           required: true
           schema:
             type: string
@@ -345,7 +345,7 @@ paths:
       summary: Delete a single script by ID
       parameters:
         - in: path
-          name: script_id
+          name: id
           required: true
           schema:
             type: string

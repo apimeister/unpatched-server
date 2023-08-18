@@ -91,6 +91,7 @@ pub async fn init_database(pool: &SqlitePool) -> Result<(), sqlx::Error> {
 /// | alias | TEXT | host alias (name)
 /// | attributes | TEXT | host labels
 /// | ip | TEXT | host ip:port
+/// | seed_key | TEXT | uuid
 /// | api_key | TEXT | uuid
 /// | api_key_ttl | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 /// | last_pong | TEXT | last checkin from agent
@@ -102,6 +103,7 @@ async fn create_hosts_table(mut connection: PoolConnection<Sqlite>) -> Result<()
             alias TEXT,
             attributes TEXT,
             ip TEXT,
+            seed_key TEXT,
             api_key TEXT,
             api_key_ttl TEXT,
             last_pong TEXT

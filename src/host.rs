@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use chrono::Utc;
+use chrono::{DateTime, Days, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{
     pool::PoolConnection,
@@ -14,10 +14,10 @@ use sqlx::{
     sqlite::{SqliteQueryResult, SqliteRow},
     Row, Sqlite, SqlitePool,
 };
-use tracing::debug;
+use tracing::{debug, info};
 use uuid::Uuid;
 
-use crate::db::utc_to_str;
+use crate::db::{new_id, try_utc_from_str, utc_to_str};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 pub struct Host {
@@ -25,23 +25,25 @@ pub struct Host {
     pub alias: String,
     pub attributes: Vec<String>,
     pub ip: String,
-    pub last_pong: String,
+    pub api_key: Option<Uuid>,
+    pub api_key_ttl: Option<DateTime<Utc>>,
 }
 
 impl Host {
     /// Insert into or Replace `Host` in hosts table in SQLite database
     ///
-    /// | Name | Type | Comment
-    /// :--- | :--- | :---
-    /// | id | TEXT | uuid
-    /// | alias | TEXT | host alias (name)
-    /// | attributes | TEXT | host labels
-    /// | ip | TEXT | host ip:port
-    /// | last_pong | TEXT | last checkin from agent
+    /// | Name | Type | Comment | Extended Comment
+    /// :--- | :--- | :--- | ---
+    /// | id | TEXT | uuid |
+    /// | alias | TEXT | host alias (name) |
+    /// | attributes | TEXT | host labels |
+    /// | ip | TEXT | host ip:port |
+    /// | api_key | TEXT | uuid | implemented by another call, always created as NULL
+    /// | api_key_ttl | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ") | implemented by another call, always created as NULL
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
         let q = r#"REPLACE INTO hosts(id, alias, attributes, ip, last_pong) VALUES(?, ?, ?, ?, ?)"#;
         query(q)
-            .bind(&self.id.to_string())
+            .bind(self.id.to_string())
             .bind(self.alias)
             .bind(serde_json::to_string(&self.attributes).unwrap())
             .bind(self.ip)
@@ -60,7 +62,8 @@ impl From<SqliteRow> for Host {
             alias: s.get::<String, _>("alias"),
             attributes: serde_json::from_str(&s.get::<String, _>("attributes")).unwrap(),
             ip: s.get::<String, _>("ip"),
-            last_pong: s.get::<String, _>("last_pong"),
+            api_key: s.get::<String, _>("api_key").parse().ok(),
+            api_key_ttl: try_utc_from_str(&s.get::<String, _>("api_key_ttl")).ok(),
         }
     }
 }
@@ -79,6 +82,29 @@ pub async fn get_one_host_api(
     let filter = format!("id='{id}'",);
     let host_vec = get_hosts_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
     Json(host_vec.first().cloned())
+}
+
+/// API to approve host
+pub async fn approve_one_host_api(
+    Path(id): Path<Uuid>,
+    State(pool): State<SqlitePool>,
+) -> impl IntoResponse {
+    let ttl = Utc::now().checked_add_days(Days::new(30)).unwrap();
+    let _up = update_text_field(
+        id,
+        "api_key",
+        new_id().to_string(),
+        pool.acquire().await.unwrap(),
+    )
+    .await;
+    let _up = update_text_field(
+        id,
+        "api_key_ttl",
+        utc_to_str(ttl),
+        pool.acquire().await.unwrap(),
+    )
+    .await;
+    StatusCode::OK
 }
 
 /// API to delete all hosts

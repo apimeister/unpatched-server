@@ -4,7 +4,7 @@ use crate::{
     schedule::{self, Schedule},
     script::{self, Script},
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, ParseError, Utc};
 use sqlx::{
     pool::PoolConnection,
     query,
@@ -28,6 +28,11 @@ pub fn utc_from_str(s: &str) -> DateTime<Utc> {
 
 pub fn utc_to_str(s: DateTime<Utc>) -> String {
     s.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+}
+
+pub fn try_utc_from_str(s: &str) -> Result<DateTime<Utc>, ParseError> {
+    let step: DateTime<Utc> = DateTime::parse_from_rfc3339(s)?.into();
+    Ok(step)
 }
 
 /// create database
@@ -86,6 +91,8 @@ pub async fn init_database(pool: &SqlitePool) -> Result<(), sqlx::Error> {
 /// | alias | TEXT | host alias (name)
 /// | attributes | TEXT | host labels
 /// | ip | TEXT | host ip:port
+/// | api_key | TEXT | uuid
+/// | api_key_ttl | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 /// | last_pong | TEXT | last checkin from agent
 async fn create_hosts_table(mut connection: PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
     let _res = query(
@@ -95,6 +102,8 @@ async fn create_hosts_table(mut connection: PoolConnection<Sqlite>) -> Result<()
             alias TEXT,
             attributes TEXT,
             ip TEXT,
+            api_key TEXT,
+            api_key_ttl TEXT,
             last_pong TEXT
         )"#,
     )

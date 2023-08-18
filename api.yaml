@@ -229,6 +229,25 @@ paths:
           description: Host deleted successfully
         '403':
           description: Forbidden (delete failed)
+  /hosts/{id}/approve:
+    post:
+      tags:
+        - hosts
+      summary: Approve host with outdated or unknown apikey
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the host to approve
+      responses:
+        '200':
+          description: Approved host
+        '400':
+          description: Bad request
+
   /schedules:
     get:
       tags:

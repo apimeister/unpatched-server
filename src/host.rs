@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -106,6 +108,23 @@ pub async fn post_hosts_api(
     } else {
         (StatusCode::BAD_REQUEST, Json("".into()))
     }
+}
+
+/// API to update one host
+pub async fn update_one_host_api(
+    Path(id): Path<Uuid>,
+    State(pool): State<SqlitePool>,
+    Json(payload): Json<HashMap<String, String>>,
+) -> impl IntoResponse {
+    info!("{payload:?}");
+    if let Some((column, data)) = payload.into_iter().next() {
+        info!("column: {column}");
+        info!("data: {data}");
+        let _up = update_text_field(id, &column, data, pool.acquire().await.unwrap()).await;
+    };
+    let filter = format!("id='{id}'",);
+    let host_vec = get_hosts_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
+    Json(host_vec.first().cloned())
 }
 
 pub async fn get_hosts_from_db(

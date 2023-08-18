@@ -123,6 +123,7 @@ async fn main() {
         .route(
             "/api/v1/hosts/:id",
             get(host::get_one_host_api)
+                .patch(host::update_one_host_api)
                 .delete(host::delete_one_host_api)
                 .with_state(pool.clone()),
         )
@@ -512,15 +513,6 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     let handle_vec = vec![general_handle, sender_handle, recv_handle];
     join_all(handle_vec).await;
 }
-
-// /// Get ARC to Splitsink and push message onto it
-// /// Will not actually flush any data, needs another send event
-// /// either via .close() or .flush()
-// async fn sink_message(arc: &SenderSinkArc, m: Message) -> Result<(), Error> {
-//     let mut x = arc.lock().await;
-//     debug!("feeding sink: {:?}", m);
-//     x.feed(m).await
-// }
 
 /// Get ARC to Splitsink and push message onto it and flush them
 async fn send_message(arc: &SenderSinkArc, m: Message) -> Result<(), Error> {

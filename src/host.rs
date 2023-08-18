@@ -25,8 +25,10 @@ pub struct Host {
     pub alias: String,
     pub attributes: Vec<String>,
     pub ip: String,
+    pub seed_key: Uuid,
     pub api_key: Option<Uuid>,
     pub api_key_ttl: Option<DateTime<Utc>>,
+    pub last_pong: Option<DateTime<Utc>>,
 }
 
 impl Host {
@@ -38,16 +40,18 @@ impl Host {
     /// | alias | TEXT | host alias (name) |
     /// | attributes | TEXT | host labels |
     /// | ip | TEXT | host ip:port |
+    /// | seed_key | TEXT | uuid
     /// | api_key | TEXT | uuid | implemented by another call, always created as NULL
     /// | api_key_ttl | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ") | implemented by another call, always created as NULL
+    /// | last_pong | TEXT | last checkin from agent | implemented by another call, always created as NULL
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        let q = r#"REPLACE INTO hosts(id, alias, attributes, ip, last_pong) VALUES(?, ?, ?, ?, ?)"#;
+        let q = r#"REPLACE INTO hosts(id, alias, attributes, seed_key, ip) VALUES(?, ?, ?, ?, ?)"#;
         query(q)
             .bind(self.id.to_string())
             .bind(self.alias)
             .bind(serde_json::to_string(&self.attributes).unwrap())
+            .bind(self.seed_key.to_string())
             .bind(self.ip)
-            .bind(utc_to_str(Utc::now()))
             .execute(&mut *connection)
             .await
             .unwrap()
@@ -62,8 +66,10 @@ impl From<SqliteRow> for Host {
             alias: s.get::<String, _>("alias"),
             attributes: serde_json::from_str(&s.get::<String, _>("attributes")).unwrap(),
             ip: s.get::<String, _>("ip"),
+            seed_key: s.get::<String, _>("seed_key").parse().unwrap(),
             api_key: s.get::<String, _>("api_key").parse().ok(),
             api_key_ttl: try_utc_from_str(&s.get::<String, _>("api_key_ttl")).ok(),
+            last_pong: try_utc_from_str(&s.get::<String, _>("last_pong")).ok(),
         }
     }
 }

@@ -6,7 +6,7 @@ publish = false
 authors = ["Alexander Kunde<alexander@apimeister.com>", "Jens Walter<jens@apimeister.com>"]
 
 [dependencies]
-axum = { version = "0.6", features = ["ws"] }
+axum = { version = "0.6", features = ["ws", "headers"] }
 axum-server = { version = "0.5", features = ["tls-rustls"] }
 chrono = { version = "0.4.26", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }

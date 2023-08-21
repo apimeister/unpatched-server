@@ -74,6 +74,8 @@ struct Args {
 
 const UPDATE_RATE: Duration = Duration::new(5, 0);
 const SQLITE_DB: &str = "sqlite:unpatched_server_internal.sqlite";
+const TLS_CERT: &str = "unpatched.server.crt";
+const TLS_KEY: &str = "unpatched.server.key";
 
 enum Trigger {
     Cron(String),
@@ -188,18 +190,19 @@ async fn http_server(app: Router, addr: SocketAddr) {
 }
 
 async fn https_server(app: Router, addr: SocketAddr, tls_folder: PathBuf) {
-    let config =
-    match RustlsConfig::from_pem_file(tls_folder.join("unpatched.server.crt"), tls_folder.join("unpatched.server.key"))
-        .await
-        {
-            Ok(tls) => tls,
-            Err(e) => {
-                match e.kind() {
-                    ErrorKind::NotFound => panic!("TLS certificates not found under \"self-signed-certs/cert.pem\", \"self-signed-certs/key.pem\""),
-                    _ => panic!("{e}")
-                }
-            }
-        };
+    let tls_cert_path = tls_folder.join(TLS_CERT);
+    let tls_key_path = tls_folder.join(TLS_KEY);
+    let config = match RustlsConfig::from_pem_file(&tls_cert_path, &tls_key_path).await {
+        Ok(tls) => tls,
+        Err(e) => match e.kind() {
+            ErrorKind::NotFound => panic!(
+                "TLS certificates not found under:\n{}\n{}",
+                tls_cert_path.to_str().unwrap(),
+                tls_key_path.to_str().unwrap()
+            ),
+            _ => panic!("{e}"),
+        },
+    };
     info!("listening on https://{addr}/");
     axum_server::bind_rustls(addr, config)
         .serve(app.into_make_service_with_connect_info::<SocketAddr>())

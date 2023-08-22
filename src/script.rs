@@ -168,7 +168,7 @@ pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{create_database, init_database, new_id};
+    use crate::db::{create_database, init_database};
     use tracing_subscriber::{
         fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
     };
@@ -188,14 +188,14 @@ mod tests {
         assert_eq!(scripts.len(), 4);
 
         let mut script = Script {
-            id: new_id(),
+            id: Uuid::new_v4(),
             ..Default::default()
         };
         let _i1 = script
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
             .await;
-        script.id = new_id();
+        script.id = Uuid::new_v4();
         let _i2 = script
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
@@ -254,7 +254,7 @@ mod tests {
 
         init_database(&pool).await.unwrap();
         let new_script = Script {
-            id: new_id(),
+            id: Uuid::new_v4(),
             ..Default::default()
         };
         let api_post =

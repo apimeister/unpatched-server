@@ -161,7 +161,7 @@ pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{create_database, init_database, new_id};
+    use crate::db::{create_database, init_database};
     use tracing_subscriber::{
         fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
     };
@@ -181,7 +181,7 @@ mod tests {
         assert_eq!(schedules.len(), 5);
 
         let mut schedule = Schedule {
-            id: new_id(),
+            id: Uuid::new_v4(),
             ..Default::default()
         };
 
@@ -189,7 +189,7 @@ mod tests {
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
             .await;
-        schedule.id = new_id();
+        schedule.id = Uuid::new_v4();
         let _i2 = schedule
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
@@ -248,7 +248,7 @@ mod tests {
 
         init_database(&pool).await.unwrap();
         let new_schedule = Schedule {
-            id: new_id(),
+            id: Uuid::new_v4(),
             ..Default::default()
         };
 

@@ -15,17 +15,17 @@ use sqlx::{
 use tracing::debug;
 use uuid::Uuid;
 
-use crate::db::{self, get_option, utc_from_str, utc_to_str};
+use crate::db::{get_option, utc_from_str, utc_to_str};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 pub struct Execution {
-    #[serde(default = "db::new_id")]
+    #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
     pub request: DateTime<Utc>,
     pub response: Option<DateTime<Utc>>,
     pub host_id: Uuid,
     pub script_id: Uuid,
-    #[serde(default = "db::nil_id")]
+    #[serde(default = "Uuid::nil")]
     pub sched_id: Uuid,
     #[serde(default = "Utc::now")]
     pub created: DateTime<Utc>,
@@ -174,7 +174,7 @@ pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{create_database, init_database, new_id};
+    use crate::db::{create_database, init_database};
     use tracing_subscriber::{
         fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
     };
@@ -194,14 +194,14 @@ mod tests {
         assert_eq!(executions.len(), 0);
 
         let mut execution = Execution {
-            id: new_id(),
+            id: Uuid::new_v4(),
             ..Default::default()
         };
         let _i1 = execution
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
             .await;
-        execution.id = new_id();
+        execution.id = Uuid::new_v4();
         let _i2 = execution
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
@@ -214,7 +214,7 @@ mod tests {
             get_executions_from_db(Some("this-doesnt-work"), pool.acquire().await.unwrap()).await;
         assert_eq!(err_executions.len(), 0);
 
-        let new_sched_id = new_id();
+        let new_sched_id = Uuid::new_v4();
         let _upd = update_text_field(
             execution.id,
             "sched_id",
@@ -262,7 +262,7 @@ mod tests {
 
         init_database(&pool).await.unwrap();
         let new_execution = Execution {
-            id: new_id(),
+            id: Uuid::new_v4(),
             ..Default::default()
         };
 

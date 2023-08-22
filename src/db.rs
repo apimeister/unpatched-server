@@ -14,14 +14,6 @@ use sqlx::{
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-pub fn new_id() -> Uuid {
-    Uuid::new_v4().as_hyphenated().into_uuid()
-}
-
-pub fn nil_id() -> Uuid {
-    Uuid::nil().as_hyphenated().into_uuid()
-}
-
 pub fn utc_from_str(s: &str) -> DateTime<Utc> {
     DateTime::parse_from_rfc3339(s).unwrap().into()
 }
@@ -203,7 +195,7 @@ async fn create_schedules_table(mut connection: PoolConnection<Sqlite>) -> Resul
 
 async fn init_samples(pool: &Pool<Sqlite>) {
     let uptime_linux = Script {
-        id: new_id(),
+        id: Uuid::new_v4(),
         name: "uptime".into(),
         version: "0.0.1".into(),
         output_regex: ".*".into(),
@@ -212,7 +204,7 @@ async fn init_samples(pool: &Pool<Sqlite>) {
         script_content: r#"uptime -p"#.into(),
     };
     let os_version_linux = Script {
-        id: new_id(),
+        id: Uuid::new_v4(),
         name: "os_version".into(),
         version: "0.0.1".into(),
         output_regex: ".*".into(),
@@ -221,7 +213,7 @@ async fn init_samples(pool: &Pool<Sqlite>) {
         script_content: r#"cat /etc/os-release"#.into(),
     };
     let uptime_mac = Script {
-        id: new_id(),
+        id: Uuid::new_v4(),
         name: "uptime".into(),
         version: "0.0.1".into(),
         output_regex: ".*".into(),
@@ -230,7 +222,7 @@ async fn init_samples(pool: &Pool<Sqlite>) {
         script_content: r#"uptime"#.into(),
     };
     let os_version_mac = Script {
-        id: new_id(),
+        id: Uuid::new_v4(),
         name: "os_version".into(),
         version: "0.0.1".into(),
         output_regex: ".*".into(),
@@ -265,7 +257,7 @@ async fn init_samples(pool: &Pool<Sqlite>) {
             );
         }
         let sched = Schedule {
-            id: new_id(),
+            id: Uuid::new_v4(),
             script_id: s.id,
             attributes: vec![s.labels[0].clone()],
             cron: "0 * * * * * *".into(),
@@ -290,7 +282,7 @@ async fn init_samples(pool: &Pool<Sqlite>) {
         }
     }
     let sched = Schedule {
-        id: new_id(),
+        id: Uuid::new_v4(),
         script_id: uptime_linux.id,
         attributes: vec![uptime_linux.labels[0].clone()],
         cron: utc_to_str(Utc::now()),
@@ -398,7 +390,7 @@ mod tests {
         init_database(&pool).await.unwrap();
 
         let up = update_text_field(
-            new_id(),
+            Uuid::new_v4(),
             "fail-test",
             "fail-test".into(),
             "unknown",

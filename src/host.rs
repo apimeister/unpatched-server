@@ -17,7 +17,7 @@ use sqlx::{
 use tracing::{debug, info};
 use uuid::Uuid;
 
-use crate::db::{new_id, try_utc_from_str, utc_to_str};
+use crate::db::{try_utc_from_str, utc_to_str};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 pub struct Host {
@@ -99,7 +99,7 @@ pub async fn approve_one_host_api(
     let _up = update_text_field(
         id,
         "api_key",
-        new_id().to_string(),
+        Uuid::new_v4().to_string(),
         pool.acquire().await.unwrap(),
     )
     .await;

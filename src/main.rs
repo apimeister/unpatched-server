@@ -1,5 +1,5 @@
 use crate::{
-    db::{new_id, utc_from_str, utc_to_str},
+    db::{utc_from_str, utc_to_str},
     execution::Execution,
     host::Host,
 };
@@ -358,7 +358,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                 if execs.is_empty() {
                     for datetime in triggers {
                         let exe = Execution {
-                            id: new_id(),
+                            id: Uuid::new_v4(),
                             request: datetime,
                             host_id: host.id,
                             sched_id: sched.id,

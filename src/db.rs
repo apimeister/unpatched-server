@@ -430,9 +430,4 @@ mod tests {
         assert_eq!(scripts.len(), 8);
         assert_eq!(schedules.len(), 10);
     }
-
-    #[tokio::test]
-    async fn test_nil_id() {
-        assert_eq!(nil_id().to_string(), "00000000-0000-0000-0000-000000000000");
-    }
 }

@@ -212,7 +212,7 @@ pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{create_database, init_database, new_id};
+    use crate::db::{create_database, init_database};
     use tracing_subscriber::{
         fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
     };
@@ -232,7 +232,7 @@ mod tests {
         assert_eq!(hosts.len(), 0);
 
         let mut host = Host {
-            id: new_id(),
+            id: Uuid::new_v4(),
             ..Default::default()
         };
 
@@ -240,7 +240,7 @@ mod tests {
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
             .await;
-        host.id = new_id();
+        host.id = Uuid::new_v4();
         let _i2 = host
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
@@ -303,7 +303,7 @@ mod tests {
 
         init_database(&pool).await.unwrap();
         let new_host = Host {
-            id: new_id(),
+            id: Uuid::new_v4(),
             ..Default::default()
         };
 

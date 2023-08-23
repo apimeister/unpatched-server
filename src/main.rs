@@ -1,7 +1,8 @@
 use crate::{
-    db::{utc_from_str, utc_to_str},
+    db::utc_to_str,
     execution::Execution,
-    host::Host,
+    host::{Host, ScheduleState},
+    schedule::Timer,
 };
 use axum::{
     extract::connect_info::ConnectInfo,
@@ -20,8 +21,9 @@ use futures_util::{future::join_all, stream::SplitSink};
 use headers::HeaderMap;
 use host::get_hosts_from_db;
 use include_dir::{include_dir, Dir};
+use schedule::Schedule;
 use serde::{Deserialize, Serialize};
-use sqlx::sqlite::SqlitePool;
+use sqlx::{pool::PoolConnection, sqlite::SqlitePool, Sqlite};
 use std::{io::ErrorKind, path::PathBuf, time::Duration};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
@@ -76,11 +78,6 @@ const UPDATE_RATE: Duration = Duration::new(5, 0);
 const SQLITE_DB: &str = "sqlite:unpatched_server_internal.sqlite";
 const TLS_CERT: &str = "unpatched.server.crt";
 const TLS_KEY: &str = "unpatched.server.key";
-
-enum Trigger {
-    Cron(String),
-    Once(DateTime<Utc>),
-}
 
 #[tokio::main]
 async fn main() {
@@ -262,7 +259,7 @@ async fn handle_first(socket: WebSocket, who: SocketAddr, key: Uuid) {
 
 /// Actual websocket statemachine (one will be spawned per connection)
 async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
-    let this_host: Option<host::Host> = None;
+    let this_host: Option<Host> = None;
     let arc_this_host = Arc::new(Mutex::new(this_host));
     // split websocket stream so we can have both directions working independently
     let (sender, mut receiver) = socket.split();
@@ -277,39 +274,20 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
     let general_handle = tokio::spawn(async move {
         loop {
             tokio::time::sleep(UPDATE_RATE).await;
+            let now = utc_to_str(Utc::now());
 
             let host = {
                 let Some(ref host) = &*general_arc_this_host.lock().await else { continue };
                 host.clone()
             };
 
-            let schedules = schedule::get_schedules_from_db(
-                Some("active = 1"),
-                general_pool.acquire().await.unwrap(),
-            )
+            let executable_schedules = host
+                .get_all_schedules(general_pool.acquire().await.unwrap(), ScheduleState::Active)
             .await;
-            let mut executable_schedules = Vec::new();
-            let mut host_attributes = host.attributes.clone();
-            host_attributes.sort();
-            for mut sched in schedules {
-                sched.attributes.sort();
-                if host_attributes.contains(&sched.attributes()) {
-                    executable_schedules.push(sched);
-                } else {
-                    continue;
-                }
-            }
 
-            if !executable_schedules.is_empty() {
-                debug!(
-                    "Found schedules for {}: {:?}",
-                    host.alias, executable_schedules
-                );
-            }
-
+            // Generate Executions from the schedules
             for sched in executable_schedules {
-                // Generate Executions from the schedules
-                let now = utc_to_str(Utc::now());
+                // Get future executions for this schedule
                 let exec_filter = format!(
                     "host_id='{}' AND sched_id='{}' AND request > '{now}'",
                     host.id, sched.id
@@ -320,53 +298,24 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                 )
                 .await;
                 debug!("Found executions for {}: {execs:?}", host.alias);
-                let cron_iter = sched.cron.split_ascii_whitespace();
-                let trigger = match cron_iter.count() {
-                    1 => Trigger::Once(utc_from_str(&sched.cron)),
-                    5 => Trigger::Cron(format!("0 {} *", sched.cron)),
-                    7 => Trigger::Cron(sched.cron.clone()),
-                    _ => {
-                        error!(
-                            "Schedule {}: Cron {} has wrong format needs to be 5 part or 7 part cron, or a timestamp. Skipped",
-                            sched.id, sched.cron
-                        );
-                        continue;
-                    }
-                };
-                let triggers: Vec<DateTime<Utc>> = match trigger {
-                    Trigger::Cron(c) => {
-                        let cron_schedule = match c.parse::<cron::Schedule>() {
-                            Ok(cc) => cc,
-                            Err(e) => {
-                                error!(
-                                    "Schedule {}: Cron {c} parsing err. Skipped \n {e}",
-                                    sched.id
-                                );
+
+                // get execution trigger timestamp
+                let Some(trigger) =
+                    generate_execution_timestamp(&sched, general_pool.acquire().await.unwrap())
+                        .await else { continue };
+                let execs: Vec<Execution> = execs
+                    .into_iter()
+                    .filter(|ex| ex.request <= trigger)
+                    .collect();
+                if !execs.is_empty() {
+                    debug!("Execution with a closer datetime exists, skip");
                                 continue;
                             }
-                        };
-                        cron_schedule.upcoming(Utc).take(1).collect()
-                    }
-                    Trigger::Once(o) => {
-                        schedule::update_text_field(
-                            sched.id,
-                            "active",
-                            "0".into(),
-                            general_pool.acquire().await.unwrap(),
-                        )
-                        .await;
-                        vec![o]
-                    }
-                };
-
-                if execs.is_empty() {
-                    for datetime in triggers {
                         let exe = Execution {
                             id: Uuid::new_v4(),
-                            request: datetime,
+                    request: trigger,
                             host_id: host.id,
                             sched_id: sched.id,
-                            script_id: sched.script_id,
                             ..Default::default()
                         };
                         let res = exe
@@ -375,8 +324,6 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                         debug!("Created new Execution: {:?}", res);
                     }
                 }
-            }
-        }
     });
 
     // ##################
@@ -416,19 +363,16 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
             debug!("{:?}", execs);
             let mut script_exec_vec = Vec::new();
             for exe in execs {
-                let script_filter = format!("id = '{}'", exe.script_id);
-                let scripts = script::get_scripts_from_db(
-                    Some(&script_filter),
+                let filter = format!("id = '{}'", exe.sched_id);
+                let schedules = schedule::get_schedules_from_db(
+                    Some(&filter),
                     sender_pool.acquire().await.unwrap(),
                 )
                 .await;
-                debug!("{:?}", scripts);
-                let script = match scripts.first() {
-                    Some(s) => s.clone(),
-                    None => {
+                let Some(schedule) = schedules.first() else {
                         warn!(
-                            "execution {} did not find a script with id {}. Execution Skipped",
-                            exe.id, exe.script_id
+                            "execution {} did not find a schedule with id {}. Execution Skipped",
+                            exe.id, exe.sched_id
                         );
                         execution::update_text_field(
                             exe.id,
@@ -440,15 +384,44 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                         execution::update_text_field(
                             exe.id,
                             "output",
-                            "Script not found, execution skipped".into(),
+                            "Schedule not found, execution skipped".into(),
                             sender_pool.acquire().await.unwrap(),
                         )
                         .await;
                         continue;
-                    }
+                    };
+                let filter = format!("id = '{}'", schedule.script_id);
+                let scripts = script::get_scripts_from_db(
+                    Some(&filter),
+                    sender_pool.acquire().await.unwrap(),
+                )
+                .await;
+                debug!("{:?}", scripts);
+                let Some(script) = scripts.first() else {
+                    warn!(
+                        "execution {} did not find a script with id {}. Execution Skipped",
+                        exe.id, exe.sched_id
+                    );
+                    execution::update_text_field(
+                        exe.id,
+                        "response",
+                        utc_to_str(Utc::now()),
+                        sender_pool.acquire().await.unwrap(),
+                    )
+                    .await;
+                    execution::update_text_field(
+                        exe.id,
+                        "output",
+                        "Script not found, execution skipped".into(),
+                        sender_pool.acquire().await.unwrap(),
+                    )
+                    .await;
+                    continue;
                 };
-
-                let script_exec = ScriptExec { id: exe.id, script };
+                let script_exec = ScriptExec {
+                    id: exe.id,
+                    script: script.to_owned(),
+                };
                 script_exec_vec.push(script_exec)
             }
             for script_exec in script_exec_vec {
@@ -678,4 +651,43 @@ async fn agent_auth(headers: HeaderMap, who: &SocketAddr, pool: SqlitePool) -> O
     // TODO: Handle agent restart while approving keys
     warn!("unknown condition, check code!");
     None
+}
+
+async fn generate_execution_timestamp(
+    schedule: &Schedule,
+    connection: PoolConnection<Sqlite>,
+) -> Option<DateTime<Utc>> {
+    debug!("Generating execution for schedule {}", schedule.id);
+    match &schedule.timer {
+        Timer::Cron(c) => {
+            let cron_iter = c.split_ascii_whitespace();
+            let cron = match cron_iter.count() {
+                5 => format!("0 {} *", c),
+                7 => c.to_owned(),
+                _ => {
+                    error!(
+                        "Schedule {}: Cron {c} has wrong format needs to be 5 part or 7 part cron. Skipped",
+                        schedule.id
+                    );
+                    return None;
+                }
+            };
+            let cron_schedule = match cron.parse::<cron::Schedule>() {
+                Ok(cc) => cc,
+                Err(e) => {
+                    error!(
+                        "Schedule {}: Cron {cron} parsing err. Skipped \n {e}",
+                        schedule.id
+                    );
+                    return None;
+                }
+            };
+            let ts_vec: Vec<DateTime<Utc>> = cron_schedule.upcoming(Utc).take(1).collect();
+            return ts_vec.first().copied();
+        }
+        Timer::Timestamp(ts) => {
+            schedule::update_text_field(schedule.id, "active", "0".into(), connection).await;
+            Some(*ts)
+        }
+    }
 }

@@ -472,16 +472,31 @@ components:
         script_id:
           type: string
           format: uuid
-        attributes:
-          type: array
-          items:
-            type: string
-        cron:
-          type: string
+        target:
+          type: object
+          properties:
+            attributes:
+              type: array
+              items:
+                type: string
+            host_id:
+              type: string
+              format: uuid
           oneOf:
-            - format: date-time
-            - format: cron
-          example: "2023-08-17T12:55:23.112Z or * * * * * or * * * * ? * ?"
+            - required: [attributes]
+            - required: [host_id]
+        timer:
+          type: object
+          properties:
+            cron:
+              type: string
+              example: "* * * * *"
+            timestamp:
+              type: string
+              format: date-time
+          oneOf:
+            - required: [cron]
+            - required: [timestamp]
         active:
           type: boolean
     Script:

@@ -172,8 +172,10 @@ async fn create_executions_table(
 /// :--- | :--- | :---
 /// | id | TEXT | uuid
 /// | script_id | TEXT | uuid
-/// | attributes | TEXT | server label to execute on
-/// | cron | TEXT | cron pattern for execution
+/// | target_attributes | TEXT | server label to execute on
+/// | target_host_id | TEXT | server uuid to execute on
+/// | timer_cron | TEXT | cron pattern for execution
+/// | timer_ts | TEXT | timestamp for execution
 /// | active | NUMERIC | boolean
 async fn create_schedules_table(mut connection: PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
     let _res = query(
@@ -181,8 +183,10 @@ async fn create_schedules_table(mut connection: PoolConnection<Sqlite>) -> Resul
         schedules(
             id TEXT PRIMARY KEY NOT NULL,
             script_id TEXT,
-            attributes TEXT,
-            cron TEXT,
+            target_attributes TEXT,
+            target_host_id TEXT,
+            timer_cron TEXT,
+            timer_ts TEXT,
             active NUMERIC
         )"#,
     )
@@ -257,14 +261,21 @@ async fn init_samples(pool: &Pool<Sqlite>) {
         let sched = Schedule {
             id: Uuid::new_v4(),
             script_id: s.id,
-            attributes: vec![s.labels[0].clone()],
-            cron: "0 * * * * * *".into(),
+            target: schedule::Target::Attributes(vec![s.labels[0].clone()]),
+            timer: schedule::Timer::Cron("0 * * * * * *".into()),
             active: true,
         };
-        let sched_res = sched
+        let Ok(sched_res) = sched
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
-            .await;
+            .await else {
+                warn!(
+                    "DB init: sample schedule for script {} version {} with attributes {} could not be loaded",
+                    s.name, s.version, sched.attributes()
+                );
+                continue;
+            };
+
         if sched_res.rows_affected() > 0 {
             info!(
                 "DB init: sample schedule for script {} version {} with attributes {} loaded",
@@ -282,15 +293,21 @@ async fn init_samples(pool: &Pool<Sqlite>) {
     let sched = Schedule {
         id: Uuid::new_v4(),
         script_id: uptime_linux.id,
-        attributes: vec![uptime_linux.labels[0].clone()],
-        cron: utc_to_str(Utc::now()),
+        target: schedule::Target::Attributes(vec![uptime_linux.labels[0].clone()]),
+        timer: schedule::Timer::Timestamp(Utc::now()),
         active: true,
     };
 
-    let sched_res = sched
+    let Ok(sched_res) = sched
         .clone()
         .insert_into_db(pool.acquire().await.unwrap())
-        .await;
+            .await else {
+                warn!(
+                    "DB init: sample schedule for script {} version {} with attributes {} could not be loaded",
+                    uptime_linux.name, uptime_linux.version, sched.attributes()
+                );
+                return;
+            };
     if sched_res.rows_affected() > 0 {
         info!(
             "DB init: sample one-time schedule for script {} version {} with attributes {} loaded",

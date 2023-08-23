@@ -1,9 +1,10 @@
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     Json,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{
     pool::PoolConnection,
@@ -14,13 +15,42 @@ use sqlx::{
 use tracing::debug;
 use uuid::Uuid;
 
+use crate::{
+    db::{utc_from_str, utc_to_str},
+};
+
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 pub struct Schedule {
     pub id: Uuid,
     pub script_id: Uuid,
-    pub attributes: Vec<String>,
-    pub cron: String,
+    pub target: Target,
+    pub timer: Timer,
     pub active: bool,
+}
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Target {
+    Attributes(Vec<String>),
+    HostId(Uuid),
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Timer {
+    Cron(String),
+    Timestamp(DateTime<Utc>),
+}
+
+impl Default for Target {
+    fn default() -> Self {
+        Target::Attributes(Vec::new())
+    }
+}
+
+impl Default for Timer {
+    fn default() -> Self {
+        Timer::Timestamp(Utc::now())
+    }
 }
 
 impl Schedule {
@@ -30,22 +60,37 @@ impl Schedule {
     /// :--- | :--- | :---
     /// | id | TEXT | uuid
     /// | script_id | TEXT | uuid
-    /// | attributes | TEXT | server label to execute on
-    /// | cron | TEXT | cron pattern for execution
+    /// | target_attributes | TEXT | server label to execute on
+    /// | target_host_id | TEXT | uuid
+    /// | timer_cron | TEXT | cron pattern for execution
+    /// | timer_ts | TEXT | cron pattern for execution
     /// | active | bool |
     #[allow(dead_code)]
     // FIXME: write test and remove dead_code
-    pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        let q = r#"REPLACE INTO schedules( id, script_id, attributes, cron, active ) VALUES ( ?, ?, ?, ?, ? )"#;
+    pub async fn insert_into_db(
+        self,
+        mut connection: PoolConnection<Sqlite>,
+    ) -> Result<SqliteQueryResult, sqlx::Error> {
+        let target = match self.target {
+            Target::Attributes(attr) => (Some(serde_json::to_string(&attr).unwrap()), None),
+            Target::HostId(uuid) => (None, Some(uuid.to_string())),
+        };
+        let timer = match self.timer {
+            Timer::Cron(c) => (Some(c), None),
+            Timer::Timestamp(ts) => (None, Some(utc_to_str(ts))),
+        };
+
+        let q = r#"REPLACE INTO schedules( id, script_id, target_attributes, target_host_id, timer_cron, timer_ts, active ) VALUES ( ?, ?, ?, ?, ?, ?, ? )"#;
         query(q)
             .bind(self.id.to_string())
             .bind(self.script_id.to_string())
-            .bind(serde_json::to_string(&self.attributes).unwrap())
-            .bind(self.cron)
+            .bind(target.0)
+            .bind(target.1)
+            .bind(timer.0)
+            .bind(timer.1)
             .bind(self.active)
             .execute(&mut *connection)
             .await
-            .unwrap()
     }
 
     /// list attributes as comma-seperated `String`
@@ -56,11 +101,24 @@ impl Schedule {
 
 impl From<SqliteRow> for Schedule {
     fn from(s: SqliteRow) -> Self {
+        let target = match s.get::<String, _>("target_host_id").parse() {
+            Ok(x) => Target::HostId(x),
+            Err(_) => Target::Attributes(
+                serde_json::from_str(&s.get::<String, _>("target_attributes")).unwrap(),
+            ),
+        };
+        let ts = s.get::<String, _>("timer_ts");
+        let timer = if !ts.is_empty() {
+            Timer::Timestamp(utc_from_str(&ts))
+        } else {
+            Timer::Cron(s.get::<String, _>("timer_cron"))
+        };
+
         Schedule {
             id: s.get::<String, _>("id").parse().unwrap(),
             script_id: s.get::<String, _>("script_id").parse().unwrap(),
-            attributes: serde_json::from_str(&s.get::<String, _>("attributes")).unwrap(),
-            cron: s.get::<String, _>("cron"),
+            target,
+            timer,
             active: s.get::<bool, _>("active"),
         }
     }
@@ -100,10 +158,18 @@ pub async fn delete_one_schedule_api(
 pub async fn post_schedules_api(
     State(pool): State<SqlitePool>,
     Json(payload): Json<Schedule>,
-) -> impl IntoResponse {
+) -> Response {
     debug!("{:?}", payload);
     let id = payload.id.to_string();
-    let res = payload.insert_into_db(pool.acquire().await.unwrap()).await;
+    let Ok(res) = payload.insert_into_db(pool.acquire().await.unwrap()).await else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    if res.rows_affected() == 1 {
+        (StatusCode::CREATED, Json(id)).into_response()
+    } else {
+        StatusCode::BAD_REQUEST.into_response()
+    }
+}
     if res.rows_affected() == 1 {
         (StatusCode::CREATED, Json(id))
     } else {

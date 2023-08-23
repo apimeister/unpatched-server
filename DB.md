@@ -41,8 +41,10 @@
 :--- | :--- | :---
 | id | TEXT | uuid v4 hyphenated
 | script_id | TEXT | uuid v4 hyphenated
-| attributes | TEXT | json |
-| cron | TEXT |
+| target_attributes | TEXT | server label to execute on
+| target_host_id | TEXT | server uuid to execute on
+| timer_cron | TEXT | cron pattern for execution
+| timer_ts | TEXT | timestamp for execution
 | active | NUMERIC | bool
 
 ### metrics - not implemented yet

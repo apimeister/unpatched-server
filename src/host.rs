@@ -14,10 +14,13 @@ use sqlx::{
     sqlite::{SqliteQueryResult, SqliteRow},
     Row, Sqlite, SqlitePool,
 };
-use tracing::{debug, info};
+use tracing::debug;
 use uuid::Uuid;
 
-use crate::db::{try_utc_from_str, utc_to_str};
+use crate::{
+    db::{try_utc_from_str, utc_to_str},
+    schedule::{self, Schedule, Target},
+};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 pub struct Host {
@@ -29,6 +32,15 @@ pub struct Host {
     pub api_key: Option<Uuid>,
     pub api_key_ttl: Option<DateTime<Utc>>,
     pub last_pong: Option<DateTime<Utc>>,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ScheduleState {
+    Active,
+    Inactive,
+    #[default]
+    All,
 }
 
 impl Host {
@@ -55,6 +67,40 @@ impl Host {
             .execute(&mut *connection)
             .await
             .unwrap()
+    }
+
+    pub async fn get_all_schedules(
+        &self,
+        connection: PoolConnection<Sqlite>,
+        state: ScheduleState,
+    ) -> Vec<Schedule> {
+        let filter = match state {
+            ScheduleState::Active => Some("active = 1"),
+            ScheduleState::Inactive => Some("active = 0"),
+            ScheduleState::All => None,
+        };
+
+        let schedules = schedule::get_schedules_from_db(filter, connection).await;
+
+        // Add all schedules that fit via host_id or attribute to schedule list
+        let mut found_schedules = Vec::new();
+        let mut host_attributes = self.attributes.clone();
+        host_attributes.sort();
+        for sched in schedules {
+            if let Target::HostId(h) = sched.target {
+                if h == self.id {
+                    found_schedules.push(sched.clone())
+                }
+            };
+            if host_attributes.contains(&sched.sorted_attributes()) {
+                found_schedules.push(sched)
+            };
+        }
+
+        if !found_schedules.is_empty() {
+            debug!("Found schedules for {}: {found_schedules:?}", self.alias,);
+        }
+        found_schedules
     }
 }
 

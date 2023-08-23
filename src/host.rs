@@ -113,6 +113,21 @@ pub async fn approve_one_host_api(
     StatusCode::OK
 }
 
+/// API to lock host
+pub async fn lock_one_host_api(
+    Path(id): Path<Uuid>,
+    State(pool): State<SqlitePool>,
+) -> impl IntoResponse {
+    let _up = update_text_field(
+        id,
+        "api_key",
+        Uuid::nil().to_string(),
+        pool.acquire().await.unwrap(),
+    )
+    .await;
+    StatusCode::OK
+}
+
 /// API to delete all hosts
 pub async fn delete_hosts_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
     delete_hosts_from_db(None, pool.acquire().await.unwrap()).await

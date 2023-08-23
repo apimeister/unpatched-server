@@ -232,7 +232,24 @@ paths:
           description: Approved host
         '400':
           description: Bad request
-
+  /hosts/{id}/lock:
+    post:
+      tags:
+        - hosts
+      summary: Lock host
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the host to lock
+      responses:
+        '200':
+          description: Locked host
+        '400':
+          description: Bad request
   /schedules:
     get:
       tags:

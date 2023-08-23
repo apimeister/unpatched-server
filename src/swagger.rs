@@ -14,6 +14,7 @@ pub async fn api_ui() -> impl IntoResponse {
       <meta name="description" content="Unpatched Server" />
       <title>Unpatched Server - SwaggerUI</title>
       <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.3.1/swagger-ui.css" />
+      <link rel="icon" href="/bandaid.svg">
     </head>
     <body>
     <div id="swagger-ui"></div>

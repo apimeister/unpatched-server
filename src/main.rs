@@ -490,14 +490,39 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     let (k, v) = t.split_once(':').unwrap_or(("", ""));
                     match k {
                         "host" => {
-                            let mut host: host::Host = serde_json::from_str(v).unwrap();
-                            host.ip = who.to_string();
-                            debug!("{:?}", host);
+                            let host: Host = serde_json::from_str(v).unwrap();
+                            host::update_text_field(
+                                host.id,
+                                "alias",
+                                host.alias,
+                                receiver_pool.acquire().await.unwrap(),
+                            )
+                            .await;
+                            host::update_text_field(
+                                host.id,
+                                "attributes",
+                                serde_json::to_string(&host.attributes).unwrap_or("".to_string()),
+                                receiver_pool.acquire().await.unwrap(),
+                            )
+                            .await;
+                            host::update_text_field(
+                                host.id,
+                                "seed_key",
+                                host.seed_key.to_string(),
+                                receiver_pool.acquire().await.unwrap(),
+                            )
+                            .await;
+                            let filter = format!("id='{}'", host.id);
+                            let central_host = host::get_hosts_from_db(
+                                Some(&filter),
+                                receiver_pool.acquire().await.unwrap(),
+                            )
+                            .await;
+
+                            debug!("{:?}", central_host);
 
                             let mut this_host = recv_arc_this_host.lock().await;
-                            *this_host = Some(host.clone());
-                            host.insert_into_db(receiver_pool.acquire().await.unwrap())
-                                .await;
+                            *this_host = central_host.first().cloned();
                             continue;
                         }
                         "script" => {
@@ -632,6 +657,14 @@ async fn agent_auth(headers: HeaderMap, who: &SocketAddr, pool: SqlitePool) -> O
         warn!("Api key for agent {agent_alias} ({agent_id}) from host {who} is outdated. Closing connection");
         return None;
     };
+
+    // invalid key
+    if db_key != api_key {
+        debug!("{db_key} - db key");
+        debug!("{api_key} - host key");
+        warn!("Api key for agent {agent_alias} ({agent_id}) from host {who} is invalid. Closing connection");
+        return None;
+    }
 
     // api_key is known and valid
     if db_key == api_key && db_ttl > Utc::now() {

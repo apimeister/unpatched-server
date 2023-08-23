@@ -136,6 +136,10 @@ async fn main() {
             post(host::lock_one_host_api).with_state(pool.clone()),
         )
         .route(
+            "/api/v1/hosts/:id/executions",
+            get(execution::get_host_executions_api).with_state(pool.clone()),
+        )
+        .route(
             "/api/v1/hosts/:id",
             get(host::get_one_host_api)
                 .patch(host::update_one_host_api)

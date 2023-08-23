@@ -250,6 +250,35 @@ paths:
           description: Locked host
         '400':
           description: Bad request
+  /hosts/{id}/executions:
+    get:
+      tags:
+        - hosts
+        - executions
+      summary: Get all executions for this host
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the host to get executions for
+        - in: query
+          name: filter
+          description: filter
+          schema:
+            type: string
+            enum: [active, inactive, all]
+      responses:
+        '200':
+          description: Successful response containing a list of executions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Schedule'
   /schedules:
     get:
       tags:

@@ -31,7 +31,6 @@
 | request | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
 | response | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
 | host_id | TEXT | uuid v4 hyphenated
-| script_id | TEXT | uuid v4 hyphenated
 | sched_id | TEXT | uuid v4 hyphenated
 | created | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
 | output | TEXT | script output

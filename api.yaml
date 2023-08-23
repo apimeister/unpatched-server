@@ -413,9 +413,6 @@ components:
         host_id:
           type: string
           format: uuid
-        script_id:
-          type: string
-          format: uuid
         sched_id:
           type: string
           format: uuid

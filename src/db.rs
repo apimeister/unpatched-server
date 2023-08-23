@@ -143,7 +143,6 @@ async fn create_scripts_table(mut connection: PoolConnection<Sqlite>) -> Result<
 /// | request | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 /// | response | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 /// | host_id | TEXT | uuid
-/// | script_id | TEXT | uuid
 /// | sched_id | TEXT | uuid
 /// | created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 /// | output | TEXT |
@@ -157,7 +156,6 @@ async fn create_executions_table(
             request TEXT,
             response TEXT,
             host_id TEXT,
-            script_id TEXT,
             sched_id TEXT,
             created TEXT,
             output TEXT

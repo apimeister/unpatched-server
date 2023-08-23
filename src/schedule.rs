@@ -93,9 +93,24 @@ impl Schedule {
             .await
     }
 
-    /// list attributes as comma-seperated `String`
+    /// list of attributes as comma-seperated `String`
     pub fn attributes(&self) -> String {
-        self.attributes.join(",")
+        if let Target::Attributes(attr) = &self.target {
+            attr.join(",")
+        } else {
+            "".into()
+        }
+    }
+
+    /// sorted list of attributes as comma-seperated `String`
+    pub fn sorted_attributes(&self) -> String {
+        if let Target::Attributes(ref attr) = &self.target {
+            let mut att = attr.clone();
+            att.sort();
+            att.join(",")
+        } else {
+            "".into()
+        }
     }
 }
 

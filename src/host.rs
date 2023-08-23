@@ -148,10 +148,8 @@ pub async fn update_one_host_api(
     State(pool): State<SqlitePool>,
     Json(payload): Json<HashMap<String, String>>,
 ) -> impl IntoResponse {
-    info!("{payload:?}");
+    debug!("{payload:?}");
     if let Some((column, data)) = payload.into_iter().next() {
-        info!("column: {column}");
-        info!("data: {data}");
         let _up = update_text_field(id, &column, data, pool.acquire().await.unwrap()).await;
     };
     let filter = format!("id='{id}'",);

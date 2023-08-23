@@ -17,6 +17,7 @@ use uuid::Uuid;
 
 use crate::{
     db::{utc_from_str, utc_to_str},
+    host::{get_hosts_from_db, ScheduleState},
 };
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
@@ -143,6 +144,56 @@ impl From<SqliteRow> for Schedule {
 pub async fn get_schedules_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
     let schedule_vec = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
     Json(schedule_vec)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ScheduleStateParams {
+    filter: Option<ScheduleState>,
+}
+
+/// API to get all schedules for a host
+pub async fn get_host_schedules_api(
+    Path(id): Path<Uuid>,
+    axum::extract::Query(params): axum::extract::Query<ScheduleStateParams>,
+    State(pool): State<SqlitePool>,
+) -> impl IntoResponse {
+    #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+    struct ExtSchedule {
+        id: Uuid,
+        script_id: Uuid,
+        target: Target,
+        timer: Timer,
+        active: bool,
+        last_execution: Option<DateTime<Utc>>,
+    }
+    let filter = format!("id='{id}'");
+    let hosts = get_hosts_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
+    let Some(host) = hosts.first() else { return Json(Vec::new()) };
+    let filter_state = params.filter.unwrap_or_default();
+    let schedules = host
+        .get_all_schedules(pool.acquire().await.unwrap(), filter_state)
+        .await;
+    let mut sched_vec: Vec<ExtSchedule> = Vec::new();
+    for sched in &schedules {
+        let now = utc_to_str(Utc::now());
+        let q = format!("SELECT sched_id, response FROM executions WHERE response < '{now}' AND host_id='{id}' AND sched_id='{}' ORDER BY response desc LIMIT 1;", sched.id);
+        let Ok(exe) = query(&q).fetch_optional(&mut *pool.acquire().await.unwrap()).await else {
+            debug!("Query for executions for {} failed. Skip", sched.id);
+            continue;
+        };
+        let last_execution = exe.map(|a| utc_from_str(&a.get::<String, _>("response")));
+
+        sched_vec.push(ExtSchedule {
+            last_execution,
+            id: sched.id,
+            script_id: sched.script_id,
+            target: sched.target.clone(),
+            timer: sched.timer.clone(),
+            active: sched.active,
+        })
+    }
+    debug!("{:?}", sched_vec);
+    Json(sched_vec)
 }
 
 /// API to get one schedule

@@ -52,21 +52,6 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Execution'
-    post:
-      tags:
-        - executions
-      summary: Create a new execution
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Execution'
-      responses:
-        '201':
-          description: Execution created successfully
-        '400':
-          description: Bad request
     delete:
       tags:
         - executions

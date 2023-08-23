@@ -593,6 +593,10 @@ components:
             - required: [timestamp]
         active:
           type: boolean
+        last_execution:
+          type: string
+          format: uuid
+          readOnly: true
     Script:
       type: object
       properties:

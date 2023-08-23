@@ -138,6 +138,7 @@ async fn main() {
         .route(
             "/api/v1/hosts/:id/schedules",
             get(schedule::get_host_schedules_api)
+                .post(schedule::post_host_schedules_api)
                 .with_state(pool.clone()),
         )
         .route(
@@ -292,7 +293,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
 
             let executable_schedules = host
                 .get_all_schedules(general_pool.acquire().await.unwrap(), ScheduleState::Active)
-            .await;
+                .await;
 
             // Generate Executions from the schedules
             for sched in executable_schedules {
@@ -318,21 +319,21 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     .collect();
                 if !execs.is_empty() {
                     debug!("Execution with a closer datetime exists, skip");
-                                continue;
-                            }
-                        let exe = Execution {
-                            id: Uuid::new_v4(),
-                    request: trigger,
-                            host_id: host.id,
-                            sched_id: sched.id,
-                            ..Default::default()
-                        };
-                        let res = exe
-                            .insert_into_db(general_pool.acquire().await.unwrap())
-                            .await;
-                        debug!("Created new Execution: {:?}", res);
-                    }
+                    continue;
                 }
+                let exe = Execution {
+                    id: Uuid::new_v4(),
+                    request: trigger,
+                    host_id: host.id,
+                    sched_id: sched.id,
+                    ..Default::default()
+                };
+                let res = exe
+                    .insert_into_db(general_pool.acquire().await.unwrap())
+                    .await;
+                debug!("Created new Execution: {:?}", res);
+            }
+        }
     });
 
     // ##################

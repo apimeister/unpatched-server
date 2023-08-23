@@ -279,6 +279,42 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Schedule'
+    post:
+      tags:
+        - hosts
+        - schedules
+      summary: Create a new schedule for this host
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the host to create schedules for
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: "#/components/schemas/Schedule"
+              - type: object
+                properties:
+                  target:
+                    properties:
+                      attributes:
+                        readOnly: true
+      responses:
+        '201':
+          description: Schedule created successfully
+          content:
+            application/json:
+              schema:
+                type: string
+                format: uuid
+        '400':
+          description: Bad request
   /hosts/{id}/executions:
     get:
       tags:

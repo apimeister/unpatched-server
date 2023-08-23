@@ -22,6 +22,7 @@ use crate::{
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 pub struct Schedule {
+    #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
     pub script_id: Uuid,
     pub target: Target,
@@ -236,10 +237,22 @@ pub async fn post_schedules_api(
         StatusCode::BAD_REQUEST.into_response()
     }
 }
+
+/// API to create a new schedule for this host
+pub async fn post_host_schedules_api(
+    Path(host_id): Path<Uuid>,
+    State(pool): State<SqlitePool>,
+    Json(payload): Json<Schedule>,
+) -> Response {
+    debug!("{:?}", payload);
+    let id = payload.id;
+    let Ok(res) = payload.insert_into_db(pool.acquire().await.unwrap()).await else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
     if res.rows_affected() == 1 {
-        (StatusCode::CREATED, Json(id))
+        (StatusCode::CREATED, Json(id)).into_response()
     } else {
-        (StatusCode::BAD_REQUEST, Json("".into()))
+        StatusCode::BAD_REQUEST.into_response()
     }
 }
 

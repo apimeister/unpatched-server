@@ -57,6 +57,10 @@ pub async fn create_database(connection: &str) -> Result<SqlitePool, sqlx::Error
 ///
 /// More info: [DB.md](DB.md)
 pub async fn init_database(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+    let _res = query(r#"PRAGMA foreign_keys = ON;"#)
+        .execute(pool.acquire().await?.as_mut())
+        .await?;
+
     create_hosts_table(pool.acquire().await?).await?;
     create_scripts_table(pool.acquire().await?).await?;
     create_executions_table(pool.acquire().await?).await?;
@@ -158,7 +162,9 @@ async fn create_executions_table(
             host_id TEXT,
             sched_id TEXT,
             created TEXT,
-            output TEXT
+            output TEXT,
+            FOREIGN KEY(host_id) REFERENCES hosts(id),
+            FOREIGN KEY(sched_id) REFERENCES schedules(id)
         )"#,
     )
     .execute(&mut *connection)
@@ -187,7 +193,9 @@ async fn create_schedules_table(mut connection: PoolConnection<Sqlite>) -> Resul
             target_host_id TEXT,
             timer_cron TEXT,
             timer_ts TEXT,
-            active NUMERIC
+            active NUMERIC,
+            FOREIGN KEY(script_id) REFERENCES scripts(id),
+            FOREIGN KEY(target_host_id) REFERENCES hosts(id)
         )"#,
     )
     .execute(&mut *connection)
@@ -299,8 +307,8 @@ async fn init_samples(pool: &Pool<Sqlite>) {
     };
 
     let Ok(sched_res) = sched
-        .clone()
-        .insert_into_db(pool.acquire().await.unwrap())
+            .clone()
+            .insert_into_db(pool.acquire().await.unwrap())
             .await else {
                 warn!(
                     "DB init: sample schedule for script {} version {} with attributes {} could not be loaded",

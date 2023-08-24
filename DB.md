@@ -35,6 +35,11 @@
 | created | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
 | output | TEXT | script output
 
+#### Constraints
+
+`FOREIGN KEY(host_id) REFERENCES hosts(id) ON DELETE CASCADE`  
+`FOREIGN KEY(sched_id) REFERENCES schedules(id) ON DELETE CASCADE`
+
 ### schedules
 
 | Name | Type | Comment
@@ -46,6 +51,11 @@
 | timer_cron | TEXT | cron pattern for execution
 | timer_ts | TEXT | timestamp for execution
 | active | NUMERIC | bool
+
+#### Constraints
+
+`FOREIGN KEY(script_id) REFERENCES scripts(id) ON DELETE CASCADE`  
+`FOREIGN KEY(target_host_id) REFERENCES hosts(id) ON DELETE CASCADE`
 
 ### metrics - not implemented yet
 

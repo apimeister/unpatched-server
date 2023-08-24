@@ -371,6 +371,34 @@ mod tests {
             .into_response();
         assert_eq!(api_post.status(), axum::http::StatusCode::CREATED);
 
+        let mut api_update = HashMap::new();
+        api_update.insert("last_pong".to_string(), utc_to_str(Utc::now()));
+
+        let api_update = update_one_host_api(
+            axum::extract::Path(new_host.id),
+            axum::extract::State(pool.clone()),
+            Json(api_update),
+        )
+        .await
+        .into_response();
+        assert_eq!(api_update.status(), axum::http::StatusCode::OK);
+
+        let lock_host = lock_one_host_api(
+            axum::extract::Path(new_host.id),
+            axum::extract::State(pool.clone()),
+        )
+        .await
+        .into_response();
+        assert_eq!(lock_host.status(), axum::http::StatusCode::OK);
+
+        let approve_host = approve_one_host_api(
+            axum::extract::Path(new_host.id),
+            axum::extract::State(pool.clone()),
+        )
+        .await
+        .into_response();
+        assert_eq!(approve_host.status(), axum::http::StatusCode::OK);
+
         let api_get_all = get_hosts_api(axum::extract::State(pool.clone()))
             .await
             .into_response();

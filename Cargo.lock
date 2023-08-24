@@ -2541,6 +2541,7 @@ dependencies = [
  "futures-util",
  "headers",
  "hugo-build",
+ "hyper",
  "include_dir",
  "serde",
  "serde_json",

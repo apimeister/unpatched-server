@@ -163,8 +163,8 @@ async fn create_executions_table(
             sched_id TEXT,
             created TEXT,
             output TEXT,
-            FOREIGN KEY(host_id) REFERENCES hosts(id),
-            FOREIGN KEY(sched_id) REFERENCES schedules(id)
+            FOREIGN KEY(host_id) REFERENCES hosts(id) ON DELETE CASCADE,
+            FOREIGN KEY(sched_id) REFERENCES schedules(id) ON DELETE CASCADE
         )"#,
     )
     .execute(&mut *connection)
@@ -194,8 +194,8 @@ async fn create_schedules_table(mut connection: PoolConnection<Sqlite>) -> Resul
             timer_cron TEXT,
             timer_ts TEXT,
             active NUMERIC,
-            FOREIGN KEY(script_id) REFERENCES scripts(id),
-            FOREIGN KEY(target_host_id) REFERENCES hosts(id)
+            FOREIGN KEY(script_id) REFERENCES scripts(id) ON DELETE CASCADE,
+            FOREIGN KEY(target_host_id) REFERENCES hosts(id) ON DELETE CASCADE
         )"#,
     )
     .execute(&mut *connection)

@@ -302,9 +302,7 @@ paths:
               - type: object
                 properties:
                   target:
-                    properties:
-                      attributes:
-                        readOnly: true
+                    readOnly: true
       responses:
         '201':
           description: Schedule created successfully
@@ -314,7 +312,11 @@ paths:
                 type: string
                 format: uuid
         '400':
-          description: Bad request
+          description: Json parser could not parse payload
+        '422':
+          description: Unprocessable Entity - Script ID or Host ID not found, could not add Schedule
+        '500':
+          description: Internal Server Error - Something went wrong. Nothing added
   /hosts/{id}/executions:
     get:
       tags:
@@ -386,7 +388,11 @@ paths:
                 type: string
                 format: uuid
         '400':
-          description: Bad request
+          description: Json parser could not parse payload
+        '422':
+          description: Unprocessable Entity - Script ID or Host ID not found, could not add Schedule
+        '500':
+          description: Internal Server Error - Something went wrong. Nothing added
   /schedules/{id}:
     get:
       tags:

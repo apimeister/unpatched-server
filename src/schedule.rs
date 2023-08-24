@@ -25,6 +25,7 @@ pub struct Schedule {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
     pub script_id: Uuid,
+    #[serde(default)]
     pub target: Target,
     pub timer: Timer,
     pub active: bool,
@@ -229,12 +230,16 @@ pub async fn post_schedules_api(
     debug!("{:?}", payload);
     let id = payload.id.to_string();
     let Ok(res) = payload.insert_into_db(pool.acquire().await.unwrap()).await else {
-        return StatusCode::BAD_REQUEST.into_response();
+        return (StatusCode::UNPROCESSABLE_ENTITY, "Script ID or Host ID not found, could not add Schedule" ).into_response();
     };
     if res.rows_affected() == 1 {
         (StatusCode::CREATED, Json(id)).into_response()
     } else {
-        StatusCode::BAD_REQUEST.into_response()
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Something went wrong. Nothing added",
+        )
+            .into_response()
     }
 }
 
@@ -242,17 +247,22 @@ pub async fn post_schedules_api(
 pub async fn post_host_schedules_api(
     Path(host_id): Path<Uuid>,
     State(pool): State<SqlitePool>,
-    Json(payload): Json<Schedule>,
+    Json(mut payload): Json<Schedule>,
 ) -> Response {
+    payload.target = Target::HostId(host_id);
     debug!("{:?}", payload);
     let id = payload.id;
     let Ok(res) = payload.insert_into_db(pool.acquire().await.unwrap()).await else {
-        return StatusCode::BAD_REQUEST.into_response();
+        return (StatusCode::UNPROCESSABLE_ENTITY, "Script ID or Host ID not found, could not add Schedule" ).into_response();
     };
     if res.rows_affected() == 1 {
         (StatusCode::CREATED, Json(id)).into_response()
     } else {
-        StatusCode::BAD_REQUEST.into_response()
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Something went wrong. Nothing added",
+        )
+            .into_response()
     }
 }
 

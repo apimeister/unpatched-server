@@ -111,7 +111,6 @@ async fn main() {
             "/api/v1/executions",
             get(execution::get_executions_api)
                 .delete(execution::delete_executions_api)
-                .post(execution::post_executions_api)
                 .with_state(pool.clone()),
         )
         .route(

@@ -12,7 +12,6 @@ use sqlx::{
     sqlite::{SqliteQueryResult, SqliteRow},
     Row, Sqlite, SqlitePool,
 };
-use tracing::debug;
 use uuid::Uuid;
 
 use crate::db::{get_option, utc_from_str, utc_to_str};
@@ -113,21 +112,6 @@ pub async fn delete_one_execution_api(
     delete_executions_from_db(Some(&filter), pool.acquire().await.unwrap()).await
 }
 
-/// API to create a new execution
-pub async fn post_executions_api(
-    State(pool): State<SqlitePool>,
-    Json(payload): Json<Execution>,
-) -> impl IntoResponse {
-    debug!("{:?}", payload);
-    let id = payload.id.to_string();
-    let res = payload.insert_into_db(pool.acquire().await.unwrap()).await;
-    if res.rows_affected() == 1 {
-        (StatusCode::CREATED, Json(id))
-    } else {
-        (StatusCode::BAD_REQUEST, Json("".into()))
-    }
-}
-
 pub async fn get_executions_from_db(
     filter: Option<&str>,
     mut connection: PoolConnection<Sqlite>,
@@ -180,7 +164,12 @@ pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{create_database, init_database};
+    use crate::{
+        db::{create_database, init_database},
+        host::Host,
+        schedule::{get_schedules_from_db, Schedule},
+        script::Script,
+    };
     use tracing_subscriber::{
         fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
     };
@@ -199,32 +188,48 @@ mod tests {
         let executions = get_executions_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(executions.len(), 0);
 
+        // prepare a host to reference in the execution (nil_id)
+        let host = Host::default();
+        let host_id = host.id;
+        let _host = host.insert_into_db(pool.acquire().await.unwrap()).await;
+
+        // prepare a script to reference in the schedule (nil_id)
+        let script = Script::default();
+        let _script = script.insert_into_db(pool.acquire().await.unwrap()).await;
+
+        // prepare a sched to reference in the execution (nil_id)
+        let sched = Schedule::default();
+        let sched_id = sched.id;
+        let _sched = sched.insert_into_db(pool.acquire().await.unwrap()).await;
+
         let mut execution = Execution {
-            id: Uuid::new_v4(),
+            host_id,
+            sched_id,
             ..Default::default()
         };
-        let _i1 = execution
+        let i1 = execution
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
             .await;
+        assert_eq!(i1.rows_affected(), 1);
         execution.id = Uuid::new_v4();
-        let _i2 = execution
+        let i2 = execution
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
             .await;
-
+        assert_eq!(i2.rows_affected(), 1);
         let executions = count_rows(pool.acquire().await.unwrap()).await.unwrap();
         assert_eq!(executions, 2);
 
         let err_executions =
-            get_executions_from_db(Some("this-doesnt-work"), pool.acquire().await.unwrap()).await;
+            get_executions_from_db(Some("this_doesnt_work"), pool.acquire().await.unwrap()).await;
         assert_eq!(err_executions.len(), 0);
+        let schedules = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
 
-        let new_sched_id = Uuid::new_v4();
         let _upd = update_text_field(
             execution.id,
             "sched_id",
-            new_sched_id.to_string(),
+            schedules[0].id.to_string(),
             pool.acquire().await.unwrap(),
         )
         .await;
@@ -234,7 +239,7 @@ mod tests {
         )
         .await;
         assert_eq!(executions.len(), 1);
-        assert_eq!(executions[0].sched_id, new_sched_id);
+        assert_eq!(executions[0].sched_id, schedules[0].id);
 
         let single_del = delete_executions_from_db(
             Some(format!("id='{}'", execution.id).as_str()),
@@ -267,18 +272,32 @@ mod tests {
         let pool = create_database("sqlite::memory:").await.unwrap();
 
         init_database(&pool).await.unwrap();
-        let new_execution = Execution {
-            id: Uuid::new_v4(),
+
+        // prepare a host to reference in the execution (nil_id)
+        let host = Host::default();
+        let host_id = host.id;
+        let _host = host.insert_into_db(pool.acquire().await.unwrap()).await;
+
+        // prepare a script to reference in the schedule (nil_id)
+        let script = Script::default();
+        let _script = script.insert_into_db(pool.acquire().await.unwrap()).await;
+
+        // prepare a sched to reference in the execution (nil_id)
+        let sched = Schedule::default();
+        let sched_id = sched.id;
+        let _sched = sched.insert_into_db(pool.acquire().await.unwrap()).await;
+
+        let execution = Execution {
+            host_id,
+            sched_id,
             ..Default::default()
         };
 
-        let api_post = post_executions_api(
-            axum::extract::State(pool.clone()),
-            Json(new_execution.clone()),
-        )
-        .await
-        .into_response();
-        assert_eq!(api_post.status(), axum::http::StatusCode::CREATED);
+        let i1 = execution
+            .clone()
+            .insert_into_db(pool.acquire().await.unwrap())
+            .await;
+        assert_eq!(i1.rows_affected(), 1);
 
         let api_get_all = get_executions_api(axum::extract::State(pool.clone()))
             .await
@@ -286,7 +305,7 @@ mod tests {
         assert_eq!(api_get_all.status(), axum::http::StatusCode::OK);
 
         let api_get_one = get_one_execution_api(
-            axum::extract::Path(new_execution.id),
+            axum::extract::Path(execution.id),
             axum::extract::State(pool.clone()),
         )
         .await
@@ -294,7 +313,7 @@ mod tests {
         assert_eq!(api_get_one.status(), axum::http::StatusCode::OK);
 
         let api_del_one = delete_one_execution_api(
-            axum::extract::Path(new_execution.id),
+            axum::extract::Path(execution.id),
             axum::extract::State(pool.clone()),
         )
         .await

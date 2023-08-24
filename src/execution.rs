@@ -312,6 +312,14 @@ mod tests {
         .into_response();
         assert_eq!(api_get_one.status(), axum::http::StatusCode::OK);
 
+        let get_host_executions_api = get_host_executions_api(
+            axum::extract::Path(host_id),
+            axum::extract::State(pool.clone()),
+        )
+        .await
+        .into_response();
+        assert_eq!(get_host_executions_api.status(), axum::http::StatusCode::OK);
+
         let api_del_one = delete_one_execution_api(
             axum::extract::Path(execution.id),
             axum::extract::State(pool.clone()),

@@ -316,7 +316,10 @@ pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{create_database, init_database};
+    use crate::{
+        db::{create_database, init_database},
+        host::Host,
+    };
     use tracing_subscriber::{
         fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
     };
@@ -432,6 +435,65 @@ mod tests {
         .await
         .into_response();
         assert_eq!(api_get_one.status(), axum::http::StatusCode::OK);
+
+        // prepare a host to reference in the execution (nil_id)
+        let host = Host::default();
+        let host_id = host.id;
+        let _host = host.insert_into_db(pool.acquire().await.unwrap()).await;
+
+        let post_host_schedules_api = post_host_schedules_api(
+            axum::extract::Path(host_id),
+            axum::extract::State(pool.clone()),
+            Json(new_schedule.clone()),
+        )
+        .await
+        .into_response();
+        assert_eq!(
+            post_host_schedules_api.status(),
+            axum::http::StatusCode::CREATED
+        );
+
+        let get_host_schedules_api_all = get_host_schedules_api(
+            axum::extract::Path(host_id),
+            axum::extract::Query(ScheduleStateParams {
+                filter: Some(ScheduleState::All),
+            }),
+            axum::extract::State(pool.clone()),
+        )
+        .await
+        .into_response();
+        assert_eq!(
+            get_host_schedules_api_all.status(),
+            axum::http::StatusCode::OK
+        );
+
+        let get_host_schedules_api_inactive = get_host_schedules_api(
+            axum::extract::Path(host_id),
+            axum::extract::Query(ScheduleStateParams {
+                filter: Some(ScheduleState::Inactive),
+            }),
+            axum::extract::State(pool.clone()),
+        )
+        .await
+        .into_response();
+        assert_eq!(
+            get_host_schedules_api_inactive.status(),
+            axum::http::StatusCode::OK
+        );
+
+        let get_host_schedules_api_active = get_host_schedules_api(
+            axum::extract::Path(host_id),
+            axum::extract::Query(ScheduleStateParams {
+                filter: Some(ScheduleState::Active),
+            }),
+            axum::extract::State(pool.clone()),
+        )
+        .await
+        .into_response();
+        assert_eq!(
+            get_host_schedules_api_active.status(),
+            axum::http::StatusCode::OK
+        );
 
         let api_del_one = delete_one_schedule_api(
             axum::extract::Path(new_schedule.id),

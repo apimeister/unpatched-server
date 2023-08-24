@@ -286,7 +286,9 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
             let now = utc_to_str(Utc::now());
 
             let host = {
-                let Some(ref host) = &*general_arc_this_host.lock().await else { continue };
+                let Some(ref host) = &*general_arc_this_host.lock().await else {
+                    continue;
+                };
                 host.clone()
             };
 
@@ -311,7 +313,10 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                 // get execution trigger timestamp
                 let Some(trigger) =
                     generate_execution_timestamp(&sched, general_pool.acquire().await.unwrap())
-                        .await else { continue };
+                        .await
+                else {
+                    continue;
+                };
                 let execs: Vec<Execution> = execs
                     .into_iter()
                     .filter(|ex| ex.request <= trigger)
@@ -345,7 +350,9 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
         loop {
             tokio::time::sleep(UPDATE_RATE).await;
             let host = {
-                let Some(ref host) = &*sender_arc_this_host.lock().await else { continue };
+                let Some(ref host) = &*sender_arc_this_host.lock().await else {
+                    continue;
+                };
                 host.clone()
             };
             let ping_msg = format!("Agent {} you there?", host.alias).into_bytes();
@@ -379,26 +386,26 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                 )
                 .await;
                 let Some(schedule) = schedules.first() else {
-                        warn!(
-                            "execution {} did not find a schedule with id {}. Execution Skipped",
-                            exe.id, exe.sched_id
-                        );
-                        execution::update_text_field(
-                            exe.id,
-                            "response",
-                            utc_to_str(Utc::now()),
-                            sender_pool.acquire().await.unwrap(),
-                        )
-                        .await;
-                        execution::update_text_field(
-                            exe.id,
-                            "output",
-                            "Schedule not found, execution skipped".into(),
-                            sender_pool.acquire().await.unwrap(),
-                        )
-                        .await;
-                        continue;
-                    };
+                    warn!(
+                        "execution {} did not find a schedule with id {}. Execution Skipped",
+                        exe.id, exe.sched_id
+                    );
+                    execution::update_text_field(
+                        exe.id,
+                        "response",
+                        utc_to_str(Utc::now()),
+                        sender_pool.acquire().await.unwrap(),
+                    )
+                    .await;
+                    execution::update_text_field(
+                        exe.id,
+                        "output",
+                        "Schedule not found, execution skipped".into(),
+                        sender_pool.acquire().await.unwrap(),
+                    )
+                    .await;
+                    continue;
+                };
                 let filter = format!("id = '{}'", schedule.script_id);
                 let scripts = script::get_scripts_from_db(
                     Some(&filter),
@@ -593,26 +600,48 @@ async fn agent_auth(headers: HeaderMap, who: &SocketAddr, pool: SqlitePool) -> O
     let who = who.to_string();
 
     // make sure header is present and a uuid, otherwise instant reject
-    let Some(api_key) = headers.get("X_API_KEY") else { return None };
-    let Ok(api_key) = api_key.to_str() else { return None };
-    let Ok(api_key) = api_key.parse::<Uuid>() else { return None };
+    let Some(api_key) = headers.get("X_API_KEY") else {
+        return None;
+    };
+    let Ok(api_key) = api_key.to_str() else {
+        return None;
+    };
+    let Ok(api_key) = api_key.parse::<Uuid>() else {
+        return None;
+    };
     debug!("X_API_KEY: {}", api_key);
 
     // make sure header is present and a uuid, otherwise instant reject
-    let Some(seed_key) = headers.get("X_SEED_KEY") else { return None };
-    let Ok(seed_key) = seed_key.to_str() else { return None };
-    let Ok(seed_key) = seed_key.parse::<Uuid>() else { return None };
+    let Some(seed_key) = headers.get("X_SEED_KEY") else {
+        return None;
+    };
+    let Ok(seed_key) = seed_key.to_str() else {
+        return None;
+    };
+    let Ok(seed_key) = seed_key.parse::<Uuid>() else {
+        return None;
+    };
     debug!("X_SEED_KEY: {}", seed_key);
 
     // make sure header is present and a uuid, otherwise instant reject
-    let Some(agent_id) = headers.get("X_AGENT_ID") else { return None };
-    let Ok(agent_id) = agent_id.to_str() else { return None };
-    let Ok(agent_id) = agent_id.parse::<Uuid>() else { return None };
+    let Some(agent_id) = headers.get("X_AGENT_ID") else {
+        return None;
+    };
+    let Ok(agent_id) = agent_id.to_str() else {
+        return None;
+    };
+    let Ok(agent_id) = agent_id.parse::<Uuid>() else {
+        return None;
+    };
     debug!("X_AGENT_ID: {}", agent_id);
 
     // make sure header is present and a uuid, otherwise instant reject
-    let Some(agent_alias) = headers.get("X_AGENT_ALIAS") else { return None };
-    let Ok(agent_alias) = agent_alias.to_str() else { return None };
+    let Some(agent_alias) = headers.get("X_AGENT_ALIAS") else {
+        return None;
+    };
+    let Ok(agent_alias) = agent_alias.to_str() else {
+        return None;
+    };
     debug!("X_AGENT_ALIAS: {}", agent_alias);
 
     // let's see if the host is already present

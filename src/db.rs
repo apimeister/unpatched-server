@@ -276,13 +276,14 @@ async fn init_samples(pool: &Pool<Sqlite>) {
         let Ok(sched_res) = sched
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
-            .await else {
-                warn!(
+            .await
+        else {
+            warn!(
                     "DB init: sample schedule for script {} version {} with attributes {} could not be loaded",
                     s.name, s.version, sched.attributes()
                 );
-                continue;
-            };
+            continue;
+        };
 
         if sched_res.rows_affected() > 0 {
             info!(
@@ -307,15 +308,16 @@ async fn init_samples(pool: &Pool<Sqlite>) {
     };
 
     let Ok(sched_res) = sched
-            .clone()
-            .insert_into_db(pool.acquire().await.unwrap())
-            .await else {
-                warn!(
+        .clone()
+        .insert_into_db(pool.acquire().await.unwrap())
+        .await
+    else {
+        warn!(
                     "DB init: sample schedule for script {} version {} with attributes {} could not be loaded",
                     uptime_linux.name, uptime_linux.version, sched.attributes()
                 );
-                return;
-            };
+        return;
+    };
     if sched_res.rows_affected() > 0 {
         info!(
             "DB init: sample one-time schedule for script {} version {} with attributes {} loaded",

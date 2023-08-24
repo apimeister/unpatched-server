@@ -1,7 +1,7 @@
 ---
 title: "schedules"
 ---
-<div class="container mt-4 mb-8" id="all" style="display:grid;grid-template-columns: 15em 1fr 1fr 15em 15em;"></div>
+<div class="container mt-4 mb-8" id="all"></div>
 <style>
 .header{
     font-weight: 600;
@@ -18,33 +18,33 @@ title: "schedules"
 }
 </style>
 <script>
+async function fetchScript(scriptId){
+    let script = await fetch('/api/v1/scripts/' + scriptId).then(r => r.json());
+    console.log(script);
+    return /*html*/`${script.name} <span class="badge rounded-pill text-bg-light">${script.version}</span>`;
+}
 async function init(){
-    let schedules = await fetch('/api/v1/schedules').then(r=>r.json());
+    let schedules = await fetch('/api/v1/schedules').then(r => r.json());
     console.log(schedules);
-    let s = `<div class="header" style="border-top-left-radius:1em;">cron</div>
-            <div class="header">script</div>
-            <div class="header">attributes</div>
-            <div class="header">last activity</div>
-            <div class="header" style="border-top-right-radius:1em;">next run</div>`;
+    let s = /*html*/`<div class="row">
+        <div class="header col" style="border-top-left-radius:1em;">id</div>
+        <div class="header col">script</div>
+        <div class="header col">timer</div>
+        <div class="header col">target</div>
+        <div class="header col">last activity</div>
+        <div class="header col" style="border-top-right-radius:1em;">next run</div>
+    </div>`;
     for(schedule of schedules){
-        let scriptId = mangleId(schedule.script_id);
-        s += `<div class="cell">${schedule.cron}</div>
-        <div class="cell" id="${scriptId}">${schedule.script_id}</div>
-        <div class="cell">${schedule.attributes}</div>
-        <div class="cell">${schedule.last_pong}</div>
-        <div class="cell"></div>`;
-        fetchScript(schedule.script_id);
+        s += /*html*/`<div class="row">
+            <div class="cell col">${schedule.id}</div>
+            <div class="cell col" id="x${schedule.script_id}">${await fetchScript(schedule.script_id)}</div>
+            <div class="cell col">${schedule.timer.cron || schedule.timer.timestamp}</div>
+            <div class="cell col">${schedule.target.host_id || schedule.target.attributes}</div>
+            <div class="cell col">${schedule.last_execution}</div>
+            <div class="cell col"></div>
+        </div>`;
     }
     document.querySelector("#all").innerHTML=s;
-}
-function mangleId(id){
-    id.replaceAll('-')
-}
-async function fetchScript(scriptId){
-    let result = await fetch('/api/v1/scripts/'+scriptId).then(r=>r.json());
-    // https://github.com/apimeister/unpatched-server/issues/23
-    result = result[0];
-    document.querySelector('#'+mangleId(scriptId)).innerHTML = `${result.name} <span class="badge rounded-pill text-bg-light">${result.version}</span>`;
 }
 init()
 </script>

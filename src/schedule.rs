@@ -30,6 +30,17 @@ pub struct Schedule {
     pub timer: Timer,
     pub active: bool,
 }
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+struct ExtSchedule {
+    id: Uuid,
+    script_id: Uuid,
+    target: Target,
+    timer: Timer,
+    active: bool,
+    last_execution: Option<DateTime<Utc>>,
+}
+
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum Target {
@@ -145,7 +156,30 @@ impl From<SqliteRow> for Schedule {
 /// API to get all schedules
 pub async fn get_schedules_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
     let schedule_vec = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
-    Json(schedule_vec)
+    let mut sched_vec: Vec<ExtSchedule> = Vec::new();
+    for sched in &schedule_vec {
+        let now = utc_to_str(Utc::now());
+        let q = format!("SELECT sched_id, response FROM executions WHERE response < '{now}' AND sched_id='{}' ORDER BY response desc LIMIT 1;", sched.id);
+        let Ok(exe) = query(&q)
+            .fetch_optional(&mut *pool.acquire().await.unwrap())
+            .await
+        else {
+            debug!("Query for executions for {} failed. Skip", sched.id);
+            continue;
+        };
+        let last_execution = exe.map(|a| utc_from_str(&a.get::<String, _>("response")));
+
+        sched_vec.push(ExtSchedule {
+            last_execution,
+            id: sched.id,
+            script_id: sched.script_id,
+            target: sched.target.clone(),
+            timer: sched.timer.clone(),
+            active: sched.active,
+        })
+    }
+    debug!("{:?}", sched_vec);
+    Json(sched_vec)
 }
 
 #[derive(Debug, Deserialize)]
@@ -159,18 +193,11 @@ pub async fn get_host_schedules_api(
     axum::extract::Query(params): axum::extract::Query<ScheduleStateParams>,
     State(pool): State<SqlitePool>,
 ) -> impl IntoResponse {
-    #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
-    struct ExtSchedule {
-        id: Uuid,
-        script_id: Uuid,
-        target: Target,
-        timer: Timer,
-        active: bool,
-        last_execution: Option<DateTime<Utc>>,
-    }
     let filter = format!("id='{id}'");
     let hosts = get_hosts_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
-    let Some(host) = hosts.first() else { return Json(Vec::new()) };
+    let Some(host) = hosts.first() else {
+        return Json(Vec::new());
+    };
     let filter_state = params.filter.unwrap_or_default();
     let schedules = host
         .get_all_schedules(pool.acquire().await.unwrap(), filter_state)
@@ -179,7 +206,10 @@ pub async fn get_host_schedules_api(
     for sched in &schedules {
         let now = utc_to_str(Utc::now());
         let q = format!("SELECT sched_id, response FROM executions WHERE response < '{now}' AND host_id='{id}' AND sched_id='{}' ORDER BY response desc LIMIT 1;", sched.id);
-        let Ok(exe) = query(&q).fetch_optional(&mut *pool.acquire().await.unwrap()).await else {
+        let Ok(exe) = query(&q)
+            .fetch_optional(&mut *pool.acquire().await.unwrap())
+            .await
+        else {
             debug!("Query for executions for {} failed. Skip", sched.id);
             continue;
         };
@@ -230,7 +260,11 @@ pub async fn post_schedules_api(
     debug!("{:?}", payload);
     let id = payload.id.to_string();
     let Ok(res) = payload.insert_into_db(pool.acquire().await.unwrap()).await else {
-        return (StatusCode::UNPROCESSABLE_ENTITY, "Script ID or Host ID not found, could not add Schedule" ).into_response();
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Script ID or Host ID not found, could not add Schedule",
+        )
+            .into_response();
     };
     if res.rows_affected() == 1 {
         (StatusCode::CREATED, Json(id)).into_response()
@@ -253,7 +287,11 @@ pub async fn post_host_schedules_api(
     debug!("{:?}", payload);
     let id = payload.id;
     let Ok(res) = payload.insert_into_db(pool.acquire().await.unwrap()).await else {
-        return (StatusCode::UNPROCESSABLE_ENTITY, "Script ID or Host ID not found, could not add Schedule" ).into_response();
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Script ID or Host ID not found, could not add Schedule",
+        )
+            .into_response();
     };
     if res.rows_affected() == 1 {
         (StatusCode::CREATED, Json(id)).into_response()

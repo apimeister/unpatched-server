@@ -14,18 +14,18 @@ function parse_time(inp) {
             return readable_time;
         }
 function online(last_pong){
-    // Extract individual components from the timestamp
-    const [datePart, timePart] = last_pong.split(' ');
-    const [year, month, day] = datePart.split('-');
-    const [hour, minute, second] = timePart.split(':');
-    // Create a new UTC Date object using the extracted components
-    const utcDBDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
-    const isoDBDate = utcDBDate.toISOString();
+    const utcDBDate = new Date(last_pong);
     const now = new Date(Date.now());
     const elapsed_int = now - utcDBDate;
     const elapsed = parse_time(elapsed_int);
-    return { utcDBDate, isoDBDate, elapsed };
+    return { utcDBDate, elapsed };
 }
+const nodeplus = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-node-plus" viewBox="0 0 16 16">
+  <path fill-rule="evenodd" d="M11 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM6.025 7.5a5 5 0 1 1 0 1H4A1.5 1.5 0 0 1 2.5 10h-1A1.5 1.5 0 0 1 0 8.5v-1A1.5 1.5 0 0 1 1.5 6h1A1.5 1.5 0 0 1 4 7.5h2.025zM11 5a.5.5 0 0 1 .5.5v2h2a.5.5 0 0 1 0 1h-2v2a.5.5 0 0 1-1 0v-2h-2a.5.5 0 0 1 0-1h2v-2A.5.5 0 0 1 11 5zM1.5 7a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1z"/>
+</svg>`
+const search = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+  <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+</svg>`
 async function init(){
     let agents = await fetch('/api/v1/hosts').then(r=>r.json());
     console.log(agents);
@@ -34,19 +34,20 @@ async function init(){
         const time = online(agent.last_pong);
         let atts="";
         for(attr of agent.attributes){
-            atts+=`<span class="badge rounded-pill text-bg-secondary me-1 ms-1">${attr}</span>`;
+            atts+=/*html*/`<span class="badge rounded-pill text-bg-secondary me-1 ms-1">${attr}</span>`;
         }
-        s += `<div class="card ms-2 me-2" style="width:25em;">
+        s += /*html*/`<div class="card ms-2 me-2" style="width:25em;">
         <div class="card-header">
             ${agent.alias}
         </div>
         <div class="card-body">
             <div class="card-text">${agent.id}</div>
+            <div class="card-text">Last check-in: <abbr title="${time.utcDBDate}">${time.elapsed}</abbr> ago</div>
             <div class="card-text">${atts}</div>
         </div>
         <div class="card-body" style="display: flex;justify-content: space-around;">
-            <a href="#" class="card-link">Run Script</a>
-            <a href="#" class="card-link">Show Executions</a>
+            <a class="icon-link icon-link-hover link-secondary" href="#">Run Script ${nodeplus}</a>
+            <a class="icon-link icon-link-hover link-secondary" href="#">Show Executions ${search}</a>
         </div>
         </div>`;
     }

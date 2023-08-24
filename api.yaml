@@ -115,7 +115,7 @@ paths:
     delete:
       tags:
         - hosts
-      summary: Delete all hosts
+      summary: Delete all hosts *DANGER* this will also delete all via host_id connected schedules and executions!
       responses:
         '200':
           description: All hosts deleted successfully
@@ -200,7 +200,7 @@ paths:
     delete:
       tags:
         - hosts
-      summary: Delete a single host by ID
+      summary: Delete a single host by ID *DANGER* this will also delete all via host_id connected schedules and executions for this host!
       parameters:
         - in: path
           name: id
@@ -363,7 +363,7 @@ paths:
     delete:
       tags:
         - schedules
-      summary: Delete all schedules
+      summary: Delete all schedules *DANGER* this will also delete all executions!
       responses:
         '200':
           description: All schedules deleted successfully
@@ -416,7 +416,7 @@ paths:
     delete:
       tags:
         - schedules
-      summary: Delete a single schedule by ID
+      summary: Delete a single schedule by ID *DANGER* this will also delete all executions for this schedule!
       parameters:
         - in: path
           name: id
@@ -447,7 +447,7 @@ paths:
     delete:
       tags:
         - scripts
-      summary: Delete all scripts
+      summary: Delete all scripts *DANGER* this will also delete all schedules and executions!
       responses:
         '200':
           description: Scripts deleted successfully
@@ -496,7 +496,7 @@ paths:
     delete:
       tags:
         - scripts
-      summary: Delete a single script by ID
+      summary: Delete a single script by ID *DANGER* this will also delete all schedules and executions for this script!
       parameters:
         - in: path
           name: id

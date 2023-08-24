@@ -11,11 +11,12 @@ use sqlx::{
     sqlite::{SqliteQueryResult, SqliteRow},
     Row, Sqlite, SqlitePool,
 };
-use tracing::debug;
+use tracing::{debug, error};
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 pub struct Script {
+    #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
     pub name: String,
     pub version: String,
@@ -144,6 +145,7 @@ pub async fn delete_scripts_from_db(
     };
     let res = query(&stmt).execute(&mut *connection).await;
     if res.is_err() {
+        error!("{res:?}");
         StatusCode::FORBIDDEN
     } else {
         StatusCode::OK
@@ -187,19 +189,18 @@ mod tests {
         let scripts = get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(scripts.len(), 4);
 
-        let mut script = Script {
-            id: Uuid::new_v4(),
-            ..Default::default()
-        };
-        let _i1 = script
+        let mut script = Script::default();
+        let i1 = script
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
             .await;
+        assert_eq!(i1.rows_affected(), 1);
         script.id = Uuid::new_v4();
-        let _i2 = script
+        let i2 = script
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
             .await;
+        assert_eq!(i2.rows_affected(), 1);
 
         let scripts = count_rows(pool.acquire().await.unwrap()).await.unwrap();
         assert_eq!(scripts, 6);
@@ -233,7 +234,7 @@ mod tests {
         assert_eq!(scripts, 5);
 
         let del_fail =
-            delete_scripts_from_db(Some("this-doesnt-work"), pool.acquire().await.unwrap()).await;
+            delete_scripts_from_db(Some("this_doesnt_work"), pool.acquire().await.unwrap()).await;
         assert_eq!(del_fail, axum::http::StatusCode::FORBIDDEN);
 
         let del = delete_scripts_from_db(None, pool.acquire().await.unwrap()).await;
@@ -253,10 +254,7 @@ mod tests {
         let pool = create_database("sqlite::memory:").await.unwrap();
 
         init_database(&pool).await.unwrap();
-        let new_script = Script {
-            id: Uuid::new_v4(),
-            ..Default::default()
-        };
+        let new_script = Script::default();
         let api_post =
             post_scripts_api(axum::extract::State(pool.clone()), Json(new_script.clone()))
                 .await

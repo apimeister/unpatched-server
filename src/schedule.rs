@@ -336,20 +336,20 @@ mod tests {
         assert_eq!(schedules.len(), 5);
 
         let mut schedule = Schedule {
-            id: Uuid::new_v4(),
+            script_id: schedules[0].script_id,
             ..Default::default()
         };
-
-        let _i1 = schedule
+        let i1 = schedule
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
             .await;
+        assert_eq!(i1.unwrap().rows_affected(), 1);
         schedule.id = Uuid::new_v4();
-        let _i2 = schedule
+        let i2 = schedule
             .clone()
             .insert_into_db(pool.acquire().await.unwrap())
             .await;
-
+        assert_eq!(i2.unwrap().rows_affected(), 1);
         let schedules = count_rows(pool.acquire().await.unwrap()).await.unwrap();
         assert_eq!(schedules, 7);
 
@@ -402,8 +402,18 @@ mod tests {
         let pool = create_database("sqlite::memory:").await.unwrap();
 
         init_database(&pool).await.unwrap();
+
+        let api_get_all = get_schedules_api(axum::extract::State(pool.clone()))
+            .await
+            .into_response();
+        assert_eq!(api_get_all.status(), axum::http::StatusCode::OK);
+
+        let schedules = hyper::body::to_bytes(api_get_all.into_body())
+            .await
+            .unwrap();
+        let schedules: Vec<Schedule> = serde_json::from_slice(&schedules).unwrap();
         let new_schedule = Schedule {
-            id: Uuid::new_v4(),
+            script_id: schedules[0].script_id,
             ..Default::default()
         };
 
@@ -414,11 +424,6 @@ mod tests {
         .await
         .into_response();
         assert_eq!(api_post.status(), axum::http::StatusCode::CREATED);
-
-        let api_get_all = get_schedules_api(axum::extract::State(pool.clone()))
-            .await
-            .into_response();
-        assert_eq!(api_get_all.status(), axum::http::StatusCode::OK);
 
         let api_get_one = get_one_schedule_api(
             axum::extract::Path(new_schedule.id),

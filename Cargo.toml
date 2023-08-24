@@ -26,6 +26,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.4", features = [ "v4", "fast-rng", "macro-diagnostics", "serde"]}
 
+[dev-dependencies]
+hyper = "0.14"
+
 [build-dependencies]
 hugo-build = "0.117"
 

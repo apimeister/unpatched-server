@@ -13,7 +13,8 @@ Options:
   -b, --bind <BIND>           bind adress for frontend and agent websockets [default: 127.0.0.1]
   -p, --port <PORT>           bind port for frontend and agent websockets [default: 3000]
       --no-tls                deactivate tls
-      --auto-accept-agents    auto-accept new agents (not working yet)
+      --auto-accept-agents    auto-accept new agents
+      --seven-part-cron       use 7 part instead of 5 part cron pattern
       --cert-folder <FOLDER>  Sets the certificate folder [default: ./self-signed-certs]
   -h, --help                  Print help
   -V, --version               Print version

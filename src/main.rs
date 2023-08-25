@@ -21,6 +21,7 @@ use futures_util::{future::join_all, stream::SplitSink};
 use headers::HeaderMap;
 use host::get_hosts_from_db;
 use include_dir::{include_dir, Dir};
+use once_cell::sync::OnceCell;
 use schedule::Schedule;
 use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolConnection, sqlite::SqlitePool, Sqlite};
@@ -78,6 +79,7 @@ const UPDATE_RATE: Duration = Duration::new(5, 0);
 const SQLITE_DB: &str = "sqlite:unpatched_server_internal.sqlite";
 const TLS_CERT: &str = "unpatched.server.crt";
 const TLS_KEY: &str = "unpatched.server.key";
+static AUTOACC: OnceCell<bool> = OnceCell::new();
 
 #[tokio::main]
 async fn main() {
@@ -93,6 +95,11 @@ async fn main() {
     db::init_database(&pool)
         .await
         .expect("Unable to initialize database!");
+
+    // skip agent verification
+    AUTOACC
+        .set(args.auto_accept_agents)
+        .expect("Error configuring auto_accept_agents!");
 
     // Frontend
     let web_page = ServeDir::new(WEBPAGE.path().join("target").join("site"))
@@ -231,11 +238,7 @@ async fn ws_handler(
     headers: HeaderMap,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> impl IntoResponse {
-    // use Websocket
-    // TODO: Add api-key-logic of seeding keys to agent_id as well
-    // remove hardcode
-    let auto_accept_agents = false;
-    let go_on = if auto_accept_agents {
+    let go_on = if *AUTOACC.get().unwrap_or(&false) {
         Some(Uuid::nil())
     } else {
         agent_auth(headers, &addr, pool.clone()).await

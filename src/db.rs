@@ -270,7 +270,7 @@ async fn init_samples(pool: &Pool<Sqlite>) {
             id: Uuid::new_v4(),
             script_id: s.id,
             target: schedule::Target::Attributes(vec![s.labels[0].clone()]),
-            timer: schedule::Timer::Cron("0 * * * * * *".into()),
+            timer: schedule::Timer::Cron("* * * * *".into()),
             active: true,
         };
         let Ok(sched_res) = sched

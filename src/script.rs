@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -22,7 +24,7 @@ pub struct Script {
     pub version: String,
     pub output_regex: String,
     pub labels: Vec<String>,
-    pub timeout: String,
+    pub timeout: Duration,
     pub script_content: String,
 }
 
@@ -36,17 +38,17 @@ impl Script {
     /// | version | TEXT |
     /// | output_regex | TEXT | regex for result parsing
     /// | labels | TEXT | script labels
-    /// | timeout | TEXT | timeout (1s, 5m, 3h etc.)
+    /// | timeout_in_s | INT | timeout in seconds
     /// | script_content | TEXT | original script
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        let q = r#"REPLACE INTO scripts( id, name, version, output_regex, labels, timeout, script_content ) VALUES ( ?, ?, ?, ?, ?, ?, ? )"#;
+        let q = r#"REPLACE INTO scripts( id, name, version, output_regex, labels, timeout_in_s, script_content ) VALUES ( ?, ?, ?, ?, ?, ?, ? )"#;
         query(q)
             .bind(self.id.to_string())
             .bind(self.name)
             .bind(self.version)
             .bind(self.output_regex)
             .bind(serde_json::to_string(&self.labels).unwrap())
-            .bind(self.timeout)
+            .bind(self.timeout.as_secs() as i64)
             .bind(self.script_content)
             .execute(&mut *connection)
             .await
@@ -66,7 +68,7 @@ impl From<SqliteRow> for Script {
             version: s.get::<String, _>("version"),
             output_regex: s.get::<String, _>("output_regex"),
             labels: serde_json::from_str(&s.get::<String, _>("labels")).unwrap(),
-            timeout: s.get::<String, _>("timeout"),
+            timeout: Duration::new(s.get::<i64, _>("timeout_in_s").unsigned_abs(), 0),
             script_content: s.get::<String, _>("script_content"),
         }
     }
@@ -211,8 +213,8 @@ mod tests {
 
         let _upd = update_text_field(
             script.id,
-            "timeout",
-            "100s".to_string(),
+            "timeout_in_s",
+            "100".to_string(),
             pool.acquire().await.unwrap(),
         )
         .await;
@@ -222,7 +224,7 @@ mod tests {
         )
         .await;
         assert_eq!(scripts.len(), 1);
-        assert_eq!(scripts[0].timeout, "100s");
+        assert_eq!(scripts[0].timeout, Duration::new(100, 0));
 
         let single_del = delete_scripts_from_db(
             Some(format!("id='{}'", script.id).as_str()),

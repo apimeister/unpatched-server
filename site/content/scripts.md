@@ -51,8 +51,9 @@ async function init(){
                                     </div>
                                     <div class="row mb-3">
                                         <div class="col">
-                                            <label for="scriptTimeout" class="form-label"><abbr title="One of:[y,mon,w,d,h,m,s,ms], use + to combine">Timeout</abbr></label>
-                                            <input id="scriptTimeout" name="timeout" type="text" class="form-control" value="${script.timeout}">
+                                            <label for="scriptTimeout" class="form-label">Timeout in seconds</label>
+                                            <input id="scriptTimeout" name="timeout" type="text" class="form-control" value="${script.timeout.secs}" oninput="time(this.value)">
+                                            <p id="scriptTimeoutHint">Info (readable): ${parse_time(script.timeout.secs)}</p>
                                         </div>
                                     </div>
                                     <div class="row mb-3">
@@ -119,6 +120,7 @@ async function sendScript(form, semver){
             version_arr[0] = parseInt(version_arr[0]) + 1;
             break;
         }
+    formDataObject.timeout = { secs: parseInt(formDataObject.timeout), nanos: 0 };
     formDataObject.version = version_arr.join('.');
     let formDataJsonString = JSON.stringify(formDataObject);
     console.log(formDataJsonString);
@@ -137,22 +139,19 @@ async function sendScript(form, semver){
     }
     return res.json();
 }
-init()
-// const sampleForm = document.getElementById("script-form");
-// sampleForm.addEventListener("submit", async (e) => {
-//   e.preventDefault();
-//   let form = e.currentTarget;
-//   let url = form.action;
-//   try {
-//     let responseData = await postFormFieldsAsJson({ url, formData });
-//     let { serverDataResponse } = responseData;
-//     console.log(serverDataResponse);
-//   } catch (error) {
-//     console.error(error);
-//   }
-// });
-// async function postFormFieldsAsJson({ url, formData }) {
-//   let formDataObject = Object.fromEntries(formData.entries());
-//   let formDataJsonString = JSON.stringify(formDataObject);
-//   console.log(formDataJsonString);
+function parse_time(inp) {
+            const hours = Math.floor(inp / 3600);
+            let minutes = Math.floor((inp % 3600) / 60);
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            let seconds = Math.floor((inp % 3600) % 60);
+            seconds = seconds < 10 ? '0' + seconds : seconds;
+            const readable_time = /*html*/`${hours}h:${minutes}m:${seconds}s`;
+            return readable_time;
+        }
+function time(seconds) {
+    const hint = document.getElementById("scriptTimeoutHint");
+    const pretty_time = parse_time(seconds);
+    hint.innerHTML = `Info (readable): ${pretty_time}`;
+}
+init();
 </script>

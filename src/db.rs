@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 
 use crate::{
     schedule::{self, Schedule},
@@ -119,7 +119,7 @@ async fn create_hosts_table(mut connection: PoolConnection<Sqlite>) -> Result<()
 /// | version | TEXT |
 /// | output_regex | TEXT | regex for result parsing
 /// | labels | TEXT | script labels
-/// | timeout | TEXT | timeout (1s, 5m, 3h etc.)
+/// | timeout_in_s | INT | timeout in seconds
 /// | script_content | TEXT | original script
 async fn create_scripts_table(mut connection: PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
     let _res = query(
@@ -130,7 +130,7 @@ async fn create_scripts_table(mut connection: PoolConnection<Sqlite>) -> Result<
             version TEXT,
             output_regex TEXT,
             labels TEXT,
-            timeout TEXT,
+            timeout_in_s INT,
             script_content TEXT
         )"#,
     )
@@ -204,40 +204,48 @@ async fn create_schedules_table(mut connection: PoolConnection<Sqlite>) -> Resul
 }
 
 async fn init_samples(pool: &Pool<Sqlite>) {
+    let version = "0.0.1";
+    let output_regex = ".*";
+    let timeout = Duration::new(5, 0);
+    let name = "uptime";
+
     let uptime_linux = Script {
         id: Uuid::new_v4(),
-        name: "uptime".into(),
-        version: "0.0.1".into(),
-        output_regex: ".*".into(),
+        name: name.to_string(),
+        version: version.to_string(),
+        output_regex: output_regex.to_string(),
         labels: vec!["linux".to_string(), "sample1".to_string()],
-        timeout: "5s".into(),
+        timeout,
         script_content: r#"uptime -p"#.into(),
-    };
-    let os_version_linux = Script {
-        id: Uuid::new_v4(),
-        name: "os_version".into(),
-        version: "0.0.1".into(),
-        output_regex: ".*".into(),
-        labels: vec!["linux".to_string(), "sample2".to_string()],
-        timeout: "5s".into(),
-        script_content: r#"cat /etc/os-release"#.into(),
     };
     let uptime_mac = Script {
         id: Uuid::new_v4(),
-        name: "uptime".into(),
-        version: "0.0.1".into(),
-        output_regex: ".*".into(),
+        name: name.to_string(),
+        version: version.to_string(),
+        output_regex: output_regex.to_string(),
         labels: vec!["mac".to_string(), "sample3".to_string()],
-        timeout: "5s".into(),
+        timeout,
         script_content: r#"uptime"#.into(),
+    };
+
+    let name = "os_version".to_string();
+
+    let os_version_linux = Script {
+        id: Uuid::new_v4(),
+        name: name.to_string(),
+        version: version.to_string(),
+        output_regex: output_regex.to_string(),
+        labels: vec!["linux".to_string(), "sample2".to_string()],
+        timeout,
+        script_content: r#"cat /etc/os-release"#.into(),
     };
     let os_version_mac = Script {
         id: Uuid::new_v4(),
-        name: "os_version".into(),
-        version: "0.0.1".into(),
-        output_regex: ".*".into(),
+        name: name.to_string(),
+        version: version.to_string(),
+        output_regex: output_regex.to_string(),
         labels: vec!["mac".to_string(), "sample4".to_string()],
-        timeout: "5s".into(),
+        timeout,
         script_content: r#"sw_vers"#.into(),
     };
     let v = vec![

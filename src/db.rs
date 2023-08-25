@@ -229,7 +229,7 @@ async fn init_samples(pool: &Pool<Sqlite>) {
     };
 
     let name = "os_version".to_string();
-    
+
     let os_version_linux = Script {
         id: Uuid::new_v4(),
         name: name.to_string(),

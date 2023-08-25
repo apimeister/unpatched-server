@@ -1,8 +1,6 @@
 # DB Tables
 
-## table structures
-
-### scripts
+## scripts
 
 | Name | Type | Comment
 :--- | :--- | :---
@@ -11,10 +9,10 @@
 | version | TEXT |
 | output_regex | TEXT |
 | labels | TEXT | json |
-| timeout | TEXT |
+| timeout_in_s | INT |
 | script_content | TEXT |
 
-### hosts
+## hosts
 
 | Name | Type | Comment
 :--- | :--- | :---
@@ -23,7 +21,7 @@
 | attributes | TEXT | json |
 | last_pong | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
 
-### executions
+## executions
 
 | Name | Type | Comment
 :--- | :--- | :---
@@ -35,12 +33,12 @@
 | created | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
 | output | TEXT | script output
 
-#### Constraints
+### executions constraints
 
 `FOREIGN KEY(host_id) REFERENCES hosts(id) ON DELETE CASCADE`  
 `FOREIGN KEY(sched_id) REFERENCES schedules(id) ON DELETE CASCADE`
 
-### schedules
+## schedules
 
 | Name | Type | Comment
 :--- | :--- | :---
@@ -52,12 +50,12 @@
 | timer_ts | TEXT | timestamp for execution
 | active | NUMERIC | bool
 
-#### Constraints
+### schedules constraints
 
 `FOREIGN KEY(script_id) REFERENCES scripts(id) ON DELETE CASCADE`  
 `FOREIGN KEY(target_host_id) REFERENCES hosts(id) ON DELETE CASCADE`
 
-### metrics - not implemented yet
+## metrics - not implemented yet
 
 | Name | Type | Comment
 :--- | :--- | :---

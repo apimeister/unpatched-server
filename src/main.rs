@@ -70,6 +70,9 @@ struct Args {
     #[arg(long)]
     //FIXME: make this work!
     auto_accept_agents: bool,
+    /// use 7 part instead of 5 part cron pattern
+    #[arg(long)]
+    seven_part_cron: bool,
     /// Sets the certificate folder
     #[arg(long, value_name = "FOLDER", default_value = "./self-signed-certs")]
     cert_folder: PathBuf,
@@ -79,6 +82,8 @@ const UPDATE_RATE: Duration = Duration::new(5, 0);
 const SQLITE_DB: &str = "sqlite:unpatched_server_internal.sqlite";
 const TLS_CERT: &str = "unpatched.server.crt";
 const TLS_KEY: &str = "unpatched.server.key";
+
+static CRON: OnceCell<bool> = OnceCell::new();
 static AUTOACC: OnceCell<bool> = OnceCell::new();
 
 #[tokio::main]
@@ -95,6 +100,10 @@ async fn main() {
     db::init_database(&pool)
         .await
         .expect("Unable to initialize database!");
+
+    // cron
+    CRON.set(args.seven_part_cron)
+        .expect("Error configuring cron format!");
 
     // skip agent verification
     AUTOACC
@@ -314,9 +323,12 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                 debug!("Found executions for {}: {execs:?}", host.alias);
 
                 // get execution trigger timestamp
-                let Some(trigger) =
-                    generate_execution_timestamp(&sched, general_pool.acquire().await.unwrap())
-                        .await
+                let Some(trigger) = generate_execution_timestamp(
+                    &sched,
+                    general_pool.acquire().await.unwrap(),
+                    *CRON.get().unwrap_or(&false),
+                )
+                .await
                 else {
                     continue;
                 };
@@ -730,21 +742,15 @@ async fn agent_auth(headers: HeaderMap, who: &SocketAddr, pool: SqlitePool) -> O
 async fn generate_execution_timestamp(
     schedule: &Schedule,
     connection: PoolConnection<Sqlite>,
+    seven_part_cron: bool,
 ) -> Option<DateTime<Utc>> {
     debug!("Generating execution for schedule {}", schedule.id);
     match &schedule.timer {
         Timer::Cron(c) => {
-            let cron_iter = c.split_ascii_whitespace();
-            let cron = match cron_iter.count() {
-                5 => format!("0 {} *", c),
-                7 => c.to_owned(),
-                _ => {
-                    error!(
-                        "Schedule {}: Cron {c} has wrong format needs to be 5 part or 7 part cron. Skipped",
-                        schedule.id
-                    );
-                    return None;
-                }
+            let cron = if seven_part_cron {
+                c.to_string()
+            } else {
+                format!("0 {} *", c)
             };
             let cron_schedule = match cron.parse::<cron::Schedule>() {
                 Ok(cc) => cc,

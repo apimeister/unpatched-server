@@ -1,7 +1,8 @@
 name: pr
 on:
   workflow_dispatch:
-  pull_request:
+  push:
+    branches: [main]
 jobs:
   build:
     permissions: write-all
@@ -28,13 +29,16 @@ jobs:
     - name: Run rustfmt
       run: cargo fmt --all -- --check
     - name: Run clippy
-      run: cargo clippy --all-targets -- -D warnings
+      run: cargo clippy --all-targets -- -D warnings --target x86_64-unknown-linux-musl
     - uses: taiki-e/install-action@nextest
     - name: Cargo Test
       run: cargo nextest run --no-fail-fast
-    - name: merge
-      if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
-      run: |
-        gh pr merge --merge $GITHUB_HEAD_REF
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Cargo Build Release
+      run: cargo build --release --target x86_64-unknown-linux-musl
+    - name: dtz upload
+      uses: DownToZero-cloud/objectstore-upload@main
+      with:
+        api_key: ${{ secrets.DTZ_API_KEY }}
+        context_id: ${{ secrets.DTZ_CONTEXT_ID }}
+        object_key: unpatched-server
+        name: target/x86_64-unknown-linux-musl/release/unpatched-server

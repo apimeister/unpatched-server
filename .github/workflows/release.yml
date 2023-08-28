@@ -1,27 +1,84 @@
 on:
-  release:
-    types: [created]
-
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*.*.*"
 jobs:
-  release:
+  create:
     name: release ${{ matrix.target }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: x86_64-pc-windows-gnu
-            archive: zip
+            runner: windows-latest
           - target: x86_64-unknown-linux-musl
-            archive: tar.gz tar.xz tar.zst
+            runner: ubuntu-latest
           - target: x86_64-apple-darwin
-            archive: zip
+            runner: macos-latest
     steps:
-      - uses: actions/checkout@master
-      - name: Compile and release
-        uses: rust-build/rust-build.action@v1.4.3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v3
         with:
-          RUSTTARGET: ${{ matrix.target }}
-          ARCHIVE_TYPES: ${{ matrix.archive }}
+          submodules: 'true'
+      - name: Install Rust
+        run: rustup update stable
+      - name: Add Musl Target
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          rustup target add x86_64-unknown-linux-musl
+          sudo apt-get install musl-tools
+      - name: Run rustfmt
+        run: cargo fmt --all -- --check
+      - name: Run clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - uses: taiki-e/install-action@nextest
+      - name: Cargo Test
+        run: cargo nextest run --no-fail-fast
+      - name: Compile
+        run: cargo build --release --target ${{ matrix.target }}
+    #  package linux
+      - name: Pack
+        if: ${{ matrix.runner }} == 'ubuntu-latest'
+        run: tar -czvf unpatched-server_linux_x86_64.tar.gz -C target/${{ matrix.target }}/release unpatched-server
+      - uses: actions/upload-artifact@v3
+        if: ${{ matrix.runner }} == 'ubuntu-latest'
+        with:
+          name: unpatched-server_linux_x86_64.tar.gz
+          path: unpatched-server_linux_x86_64.tar.gz
+          if-no-files-found: error
+    #  package win, mac
+      - name: Pack
+        if: ${{ matrix.runner }} != 'ubuntu-latest'
+        run: |
+          sudo apt install zip
+          zip -jv unpatched-server_${{ matrix.target }}.zip target/${{ matrix.target }}/release/unpatched-server
+      - uses: actions/upload-artifact@v3
+        if: ${{ matrix.runner }} != 'ubuntu-latest'
+        with:
+          name: unpatched-server_${{ matrix.target }}.zip
+          path: unpatched-server_${{ matrix.target }}.zip
+          if-no-files-found: error
+  release:
+    runs-on: ubuntu-latest
+    needs: create 
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          name: unpatched-server_x86_64-pc-windows-gnu.zip
+      - uses: actions/download-artifact@v3
+        with:
+          name: unpatched-server_x86_64-apple-darwin.zip
+      - uses: actions/download-artifact@v3
+        with:
+          name: unpatched-server_linux_x86_64.tar.gz
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          generate_release_notes: true
+          files: |
+            unpatched-server_linux_x86_64.tar.gz
+            unpatched-server_x86_64-apple-darwin.zip
+            unpatched-server_x86_64-pc-windows-gnu.zip
+      

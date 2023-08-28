@@ -39,16 +39,17 @@ jobs:
           cargo build --release --target x86_64-pc-windows-gnu
           cargo build --release --target x86_64-unknown-linux-musl
       - name: Pack
+        working-directory: target
         run: |
-          tar -czvf unpatched-server_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl/release unpatched-server
-          zip -jv unpatched-server_x86_64-pc-windows-gnu.zip target/x86_64-pc-windows-gnu/release/unpatched-server.exe
-          ls -lash
+          tar -czvf unpatched-server_x86_64-unknown-linux-musl.tar.gz ../README.md ../LICENSE -C x86_64-unknown-linux-musl/release unpatched-server -C ../../ site
+          zip -jv unpatched-server_x86_64-pc-windows-gnu.zip x86_64-pc-windows-gnu/release/unpatched-server.exe ../README.md ../LICENSE
+          zip -rv unpatched-server_x86_64-pc-windows-gnu.zip site
       - uses: actions/upload-artifact@v3
         with:
           name: winlinux
           path: |
-            unpatched-server_x86_64-unknown-linux-musl.tar.gz
-            unpatched-server_x86_64-pc-windows-gnu.zip
+            target/unpatched-server_x86_64-unknown-linux-musl.tar.gz
+            target/unpatched-server_x86_64-pc-windows-gnu.zip
           if-no-files-found: error
   create-mac:
     runs-on:  macos-latest
@@ -79,12 +80,14 @@ jobs:
       - name: Compile
         run:  cargo build --release
       - name: Pack
-        run: 
-          zip -jv unpatched-server_x86_64-apple-darwin.zip target/release/unpatched-server
+        working-directory: target
+        run:
+          zip -jv unpatched-server_x86_64-apple-darwin.zip release/unpatched-server ../README.md ../LICENSE
+          zip -rv unpatched-server_x86_64-apple-darwin.zip site
       - uses: actions/upload-artifact@v3
         with:
           name: mac
-          path: unpatched-server_x86_64-apple-darwin.zip
+          path: target/unpatched-server_x86_64-apple-darwin.zip
           if-no-files-found: error
   release:
     runs-on:  ubuntu-latest

@@ -41,7 +41,7 @@ jobs:
       - name: Pack
         run: |
           tar -czvf unpatched-server_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl/release unpatched-server
-          zip -jv unpatched-server_x86_64-pc-windows-gnu.zip target/x86_64-pc-windows-gnu/release/unpatched-server
+          zip -jv unpatched-server_x86_64-pc-windows-gnu.zip target/x86_64-pc-windows-gnu/release/unpatched-server.exe
           ls -lash
       - uses: actions/upload-artifact@v3
         with:

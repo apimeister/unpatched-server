@@ -21,7 +21,7 @@ title: "schedules"
 async function fetchScript(scriptId){
     let script = await fetch('/api/v1/scripts/' + scriptId).then(r => r.json());
     console.log(script);
-    return /*html*/`${script.name} <span class="badge rounded-pill text-bg-light">${script.version}</span>`;
+    return /*html*/`${script.name} <span class="badge text-bg-secondary">${script.version}</span>`;
 }
 async function init(){
     let schedules = await fetch('/api/v1/schedules').then(r => r.json());

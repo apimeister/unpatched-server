@@ -10,13 +10,13 @@ async function init(){
     for(script of scripts){
         let l = "";
         for(label of script.labels) {
-            l +=/*html*/`<span class="badge rounded-pill text-bg-info">${label}</span>`
+            l +=/*html*/`<span class="badge text-bg-success">${label}</span>&nbsp;`
         }
         s += /*html*/`
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#x${script.id}Collapse" aria-expanded="true" aria-controls="x${script.id}Collapse">
-                        ${script.name} <span class="badge rounded-pill text-bg-secondary">${script.version}</span> <span class="text-end">${l}</span>
+                        ${script.name}&nbsp;<span class="badge text-bg-secondary">${script.version}</span>&nbsp;<span class="text-end">${l}</span>
                     </button>
                 </h2>
                 <div id="x${script.id}Collapse" class="accordion-collapse collapse" data-bs-parent="#accordionScript">

@@ -4,30 +4,50 @@ on:
     tags:
       - "v*.*.*"
 jobs:
-  create:
-    name: release ${{ matrix.target }}
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-pc-windows-gnu
-            runner: windows-latest
-          - target: x86_64-unknown-linux-musl
-            runner: ubuntu-latest
-          - target: x86_64-apple-darwin
-            runner: macos-latest
+  create-winlinux:
+    runs-on:  ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
           submodules: 'true'
       - name: Install Rust
         run: rustup update stable
-      - name: Add Musl Target
-        if: matrix.target == 'x86_64-unknown-linux-musl'
+      - name: Run rustfmt
+        run: cargo fmt --all -- --check
+      - name: Run clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - uses: taiki-e/install-action@nextest
+      - name: Cargo Test
+        run: cargo nextest run --no-fail-fast
+      - name: Install Targets
         run: |
-          rustup target add x86_64-unknown-linux-musl
-          sudo apt-get install musl-tools
+          rustup target add x86_64-pc-windows-gnu x86_64-unknown-linux-musl x86_64-apple-darwin
+          sudo apt install -y musl-tools gcc-mingw-w64
+      - name: Compile
+        run: |
+          cargo build --release --target x86_64-pc-windows-gnu
+          cargo build --release --target x86_64-unknown-linux-musl
+          cargo build --release --target x86_64-apple-darwin
+      - name: Pack
+        run: |
+          tar -czvf unpatched-server_x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl/release unpatched-server
+          zip -jv unpatched-server_x86_64-pc-windows-gnu.zip target/x86_64-pc-windows-gnu/release/unpatched-server
+          ls -lash
+      - uses: actions/upload-artifact@v3
+        with:
+          name: winlinux
+          path: |
+            unpatched-server_x86_64-unknown-linux-musl.tar.gz
+            unpatched-server_x86_64-pc-windows-gnu.zip
+          if-no-files-found: error
+  create-mac:
+    runs-on:  macos-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'true'
+      - name: Install Rust
+        run: rustup update stable
       - name: Run rustfmt
         run: cargo fmt --all -- --check
       - name: Run clippy
@@ -36,49 +56,33 @@ jobs:
       - name: Cargo Test
         run: cargo nextest run --no-fail-fast
       - name: Compile
-        run: cargo build --release --target ${{ matrix.target }}
-    #  package linux
+        run:  cargo build --release --target x86_64-apple-darwin
       - name: Pack
-        if: ${{ matrix.runner }} == 'ubuntu-latest'
-        run: tar -czvf unpatched-server_linux_x86_64.tar.gz -C target/${{ matrix.target }}/release unpatched-server
+        run: 
+          zip -jv unpatched-server_x86_64-apple-darwin.zip target/x86_64-apple-darwin/release/unpatched-server
+          ls -lash
       - uses: actions/upload-artifact@v3
-        if: ${{ matrix.runner }} == 'ubuntu-latest'
         with:
-          name: unpatched-server_linux_x86_64.tar.gz
-          path: unpatched-server_linux_x86_64.tar.gz
-          if-no-files-found: error
-    #  package win, mac
-      - name: Pack
-        if: ${{ matrix.runner }} != 'ubuntu-latest'
-        run: |
-          sudo apt install zip
-          zip -jv unpatched-server_${{ matrix.target }}.zip target/${{ matrix.target }}/release/unpatched-server
-      - uses: actions/upload-artifact@v3
-        if: ${{ matrix.runner }} != 'ubuntu-latest'
-        with:
-          name: unpatched-server_${{ matrix.target }}.zip
-          path: unpatched-server_${{ matrix.target }}.zip
+          name: mac
+          path: unpatched-server_x86_64-apple-darwin.zip
           if-no-files-found: error
   release:
-    runs-on: ubuntu-latest
-    needs: create 
+    runs-on:  ubuntu-latest
+    needs: ["create-winlinux", "create-mac"]
     steps:
       - uses: actions/download-artifact@v3
         with:
-          name: unpatched-server_x86_64-pc-windows-gnu.zip
+          name: winlinux
       - uses: actions/download-artifact@v3
         with:
-          name: unpatched-server_x86_64-apple-darwin.zip
-      - uses: actions/download-artifact@v3
-        with:
-          name: unpatched-server_linux_x86_64.tar.gz
+          name: mac
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           generate_release_notes: true
           files: |
-            unpatched-server_linux_x86_64.tar.gz
+            unpatched-server_x86_64-unknown-linux-musl.tar.gz
             unpatched-server_x86_64-apple-darwin.zip
             unpatched-server_x86_64-pc-windows-gnu.zip
       

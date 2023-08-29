@@ -137,7 +137,7 @@ async function sendScript(form, semver){
         let error = await res.text();
         throw new Error(error);
     }
-    return res.json();
+    location.reload();
 }
 function parse_time(inp) {
             const hours = Math.floor(inp / 3600);

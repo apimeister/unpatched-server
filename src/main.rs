@@ -57,7 +57,7 @@ type SenderSinkArc = Arc<Mutex<SplitSink<WebSocket, Message>>>;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// bind adress for frontend and agent websockets
+    /// bind adress for frontend and agent websockets, v6 example [::1]
     #[arg(short, long, default_value = "127.0.0.1")]
     bind: String,
     /// bind port for frontend and agent websockets

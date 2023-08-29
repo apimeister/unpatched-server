@@ -733,9 +733,17 @@ async fn agent_auth(headers: HeaderMap, who: &SocketAddr, pool: SqlitePool) -> O
         return Some(db_key);
     }
 
+    // invalid key
+    if db_key != api_key {
+        debug!("{db_key} - db key");
+        debug!("{api_key} - host key");
+        warn!("Api key for agent {agent_alias} ({agent_id}) from host {who} is invalid. Closing connection");
+        return None;
+    }
+
     // TODO: Implement update/outdated APIKEYS
     // TODO: Handle agent restart while approving keys
-    warn!("unknown condition, check code!");
+    warn!("unknown authentication condition, please open an issue at https://github.com/apimeister/unpatched-server!");
     None
 }
 

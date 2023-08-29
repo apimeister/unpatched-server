@@ -453,6 +453,14 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     id: exe.id,
                     script: script.to_owned(),
                 };
+                // lock execution via timestamp 1970
+                execution::update_text_field(
+                    exe.id,
+                    "response",
+                    utc_to_str("1970-01-01T00:00:00.000Z".parse::<DateTime<Utc>>().unwrap()),
+                    sender_pool.acquire().await.unwrap(),
+                )
+                .await;
                 script_exec_vec.push(script_exec)
             }
             for script_exec in script_exec_vec {
@@ -733,17 +741,9 @@ async fn agent_auth(headers: HeaderMap, who: &SocketAddr, pool: SqlitePool) -> O
         return Some(db_key);
     }
 
-    // invalid key
-    if db_key != api_key {
-        debug!("{db_key} - db key");
-        debug!("{api_key} - host key");
-        warn!("Api key for agent {agent_alias} ({agent_id}) from host {who} is invalid. Closing connection");
-        return None;
-    }
-
     // TODO: Implement update/outdated APIKEYS
     // TODO: Handle agent restart while approving keys
-    warn!("unknown authentication condition, please open an issue at https://github.com/apimeister/unpatched-server!");
+    warn!("unknown condition, check code!");
     None
 }
 

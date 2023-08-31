@@ -3,8 +3,10 @@ use std::{str::FromStr, time::Duration};
 use crate::{
     schedule::{self, Schedule},
     script::{self, Script},
+    user::{self, hash_password, User},
 };
 use chrono::{DateTime, ParseError, Utc};
+use email_address::EmailAddress;
 use sqlx::{
     pool::PoolConnection,
     query,
@@ -65,6 +67,7 @@ pub async fn init_database(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     create_scripts_table(pool.acquire().await?).await?;
     create_executions_table(pool.acquire().await?).await?;
     create_schedules_table(pool.acquire().await?).await?;
+    create_users_table(pool.acquire().await?).await?;
     let tables = query("PRAGMA table_list;")
         .fetch_all(&mut *pool.acquire().await.unwrap())
         .await?;
@@ -76,6 +79,11 @@ pub async fn init_database(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     } else {
         debug!("DB init: script table or schedules table has data, samples not loaded");
     }
+    let user_count = user::count_rows(pool.acquire().await?).await?;
+    if user_count == 0 {
+        init_main_user(pool).await
+    }
+
     Ok(())
 }
 
@@ -196,6 +204,31 @@ async fn create_schedules_table(mut connection: PoolConnection<Sqlite>) -> Resul
             active NUMERIC,
             FOREIGN KEY(script_id) REFERENCES scripts(id) ON DELETE CASCADE,
             FOREIGN KEY(target_host_id) REFERENCES hosts(id) ON DELETE CASCADE
+        )"#,
+    )
+    .execute(&mut *connection)
+    .await?;
+    Ok(())
+}
+
+/// Create Users Table in SQLite Database
+///
+/// | Name | Type | Comment
+/// :--- | :--- | :---
+/// | email | TEXT |
+/// | password | TEXT |
+/// | roles | TEXT |
+/// | active | NUMERIC |
+/// | created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
+async fn create_users_table(mut connection: PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
+    let _res = query(
+        r#"CREATE TABLE IF NOT EXISTS 
+        users(
+            email TEXT PRIMARY KEY NOT NULL,
+            password TEXT,
+            roles TEXT,
+            active NUMERIC,
+            created TEXT
         )"#,
     )
     .execute(&mut *connection)
@@ -341,6 +374,25 @@ async fn init_samples(pool: &Pool<Sqlite>) {
     }
 }
 
+async fn init_main_user(pool: &Pool<Sqlite>) {
+    let email = std::env::var("SUPERUSER").expect("SUPERUSER must be set");
+    let password = std::env::var("SUPERUSER_SECRET").expect("SUPERUSER_SECRET must be set");
+    let hashed_pw = hash_password(password.as_bytes()).unwrap();
+    let new_user = User {
+        email: EmailAddress::from_str(&email).unwrap(),
+        password: hashed_pw,
+        roles: "".into(),
+        active: true,
+        created: Utc::now(),
+    };
+    let user_res = new_user.insert_into_db(pool.acquire().await.unwrap()).await;
+    if user_res.rows_affected() > 0 {
+        info!("DB init: main user loaded");
+    } else {
+        error!("DB init: main user could not be loaded");
+    }
+}
+
 pub async fn update_text_field(
     id: Uuid,
     column: &str,
@@ -351,7 +403,6 @@ pub async fn update_text_field(
     let stmt = format!("UPDATE {} SET {} = ? WHERE id = ?", table, column);
     match query(&stmt)
         .bind(data)
-        // extra quotes are needed since uuid.json results in "value" instead of value
         .bind(id.to_string())
         .execute(&mut *connection)
         .await
@@ -405,7 +456,7 @@ mod tests {
             .fetch_all(&mut *pool.acquire().await.unwrap())
             .await
             .unwrap();
-        assert_eq!(tables.len(), 6);
+        assert_eq!(tables.len(), 7);
 
         // run again to check already-present branch
         init_database(&pool).await.unwrap();

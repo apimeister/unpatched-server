@@ -19,18 +19,18 @@
 | id | TEXT | uuid v4 hyphenated
 | alias | TEXT |
 | attributes | TEXT | json |
-| last_pong | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
+| last_pong | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 
 ## executions
 
 | Name | Type | Comment
 :--- | :--- | :---
 | id | TEXT | uuid v4 hyphenated
-| request | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
-| response | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
+| request | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
+| response | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 | host_id | TEXT | uuid v4 hyphenated
 | sched_id | TEXT | uuid v4 hyphenated
-| created | TEXT | as ISO8601 string ("YYYY-MM-DD HH:MM:SS")
+| created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 | output | TEXT | script output
 
 ### executions constraints
@@ -54,6 +54,16 @@
 
 `FOREIGN KEY(script_id) REFERENCES scripts(id) ON DELETE CASCADE`  
 `FOREIGN KEY(target_host_id) REFERENCES hosts(id) ON DELETE CASCADE`
+
+## users
+
+| Name | Type | Comment
+:--- | :--- | :---
+| email | TEXT |
+| password | TEXT |
+| roles | TEXT |
+| active | NUMERIC |
+| created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 
 ## metrics - not implemented yet
 

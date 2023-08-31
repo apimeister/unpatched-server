@@ -1,11 +1,11 @@
-# Monitoring Server
+# Unpatched Server
 
 [![codecov](https://codecov.io/gh/apimeister/unpatched-server/branch/main/graph/badge.svg?token=WEVL9G0F3F)](https://codecov.io/gh/apimeister/unpatched-server)
 
 ## usage
 
 ```shell
-A bash first monitoring solution
+A bash first fleet management solution for VMs and physical hosts
 
 Usage: unpatched-server [OPTIONS]
 

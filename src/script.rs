@@ -16,6 +16,8 @@ use sqlx::{
 use tracing::{debug, error};
 use uuid::Uuid;
 
+use crate::jwt::Claims;
+
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 pub struct Script {
     #[serde(default = "Uuid::new_v4")]
@@ -75,13 +77,14 @@ impl From<SqliteRow> for Script {
 }
 
 /// API to get all scripts
-pub async fn get_scripts_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
+pub async fn get_scripts_api(_claims: Claims, State(pool): State<SqlitePool>) -> impl IntoResponse {
     let script_vec = get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
     Json(script_vec)
 }
 
 /// API to get one script
 pub async fn get_one_script_api(
+    _claims: Claims,
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
 ) -> impl IntoResponse {
@@ -91,12 +94,16 @@ pub async fn get_one_script_api(
 }
 
 /// API to delete all scripts
-pub async fn delete_scripts_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
+pub async fn delete_scripts_api(
+    _claims: Claims,
+    State(pool): State<SqlitePool>,
+) -> impl IntoResponse {
     delete_scripts_from_db(None, pool.acquire().await.unwrap()).await
 }
 
 /// API to delete one script
 pub async fn delete_one_script_api(
+    _claims: Claims,
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
 ) -> impl IntoResponse {
@@ -106,6 +113,7 @@ pub async fn delete_one_script_api(
 
 /// API to create a new script
 pub async fn post_scripts_api(
+    _claims: Claims,
     State(pool): State<SqlitePool>,
     Json(payload): Json<Script>,
 ) -> impl IntoResponse {
@@ -187,7 +195,9 @@ mod tests {
 
         let pool = create_database("sqlite::memory:").await.unwrap();
 
-        init_database(&pool).await.unwrap();
+        init_database(&pool, "foo@foo.foo".into(), "bar".into())
+            .await
+            .unwrap();
         let scripts = get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(scripts.len(), 4);
 
@@ -254,21 +264,27 @@ mod tests {
             .unwrap_or(());
 
         let pool = create_database("sqlite::memory:").await.unwrap();
-
-        init_database(&pool).await.unwrap();
+        let claims: Claims = Claims::default();
+        init_database(&pool, "foo@foo.foo".into(), "bar".into())
+            .await
+            .unwrap();
         let new_script = Script::default();
-        let api_post =
-            post_scripts_api(axum::extract::State(pool.clone()), Json(new_script.clone()))
-                .await
-                .into_response();
+        let api_post = post_scripts_api(
+            claims.clone(),
+            axum::extract::State(pool.clone()),
+            Json(new_script.clone()),
+        )
+        .await
+        .into_response();
         assert_eq!(api_post.status(), axum::http::StatusCode::CREATED);
 
-        let api_get_all = get_scripts_api(axum::extract::State(pool.clone()))
+        let api_get_all = get_scripts_api(claims.clone(), axum::extract::State(pool.clone()))
             .await
             .into_response();
         assert_eq!(api_get_all.status(), axum::http::StatusCode::OK);
 
         let api_get_one = get_one_script_api(
+            claims.clone(),
             axum::extract::Path(new_script.id),
             axum::extract::State(pool.clone()),
         )
@@ -277,6 +293,7 @@ mod tests {
         assert_eq!(api_get_one.status(), axum::http::StatusCode::OK);
 
         let api_del_one = delete_one_script_api(
+            claims.clone(),
             axum::extract::Path(new_script.id),
             axum::extract::State(pool.clone()),
         )
@@ -284,7 +301,7 @@ mod tests {
         .into_response();
         assert_eq!(api_del_one.status(), axum::http::StatusCode::OK);
 
-        let api_del_all = delete_scripts_api(axum::extract::State(pool.clone()))
+        let api_del_all = delete_scripts_api(claims.clone(), axum::extract::State(pool.clone()))
             .await
             .into_response();
         assert_eq!(api_del_all.status(), axum::http::StatusCode::OK);

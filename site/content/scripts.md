@@ -5,6 +5,7 @@ title: "scripts"
 <script>
 async function init(){
     let scripts = await fetch('/api/v1/scripts').then(r=>r.json());
+    if (scripts.error == "Invalid token") { window.location.href = "/login" }
     console.log(scripts);
     let s = `<div class="container"><div class="accordion" id="accordionScript">`;
     for(script of scripts){

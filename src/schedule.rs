@@ -18,6 +18,7 @@ use uuid::Uuid;
 use crate::{
     db::{utc_from_str, utc_to_str},
     host::{get_hosts_from_db, ScheduleState},
+    jwt::Claims,
 };
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
@@ -154,7 +155,10 @@ impl From<SqliteRow> for Schedule {
 }
 
 /// API to get all schedules
-pub async fn get_schedules_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
+pub async fn get_schedules_api(
+    _claims: Claims,
+    State(pool): State<SqlitePool>,
+) -> impl IntoResponse {
     let schedule_vec = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
     let mut sched_vec: Vec<ExtSchedule> = Vec::new();
     for sched in &schedule_vec {
@@ -189,6 +193,7 @@ pub struct ScheduleStateParams {
 
 /// API to get all schedules for a host
 pub async fn get_host_schedules_api(
+    _claims: Claims,
     Path(id): Path<Uuid>,
     axum::extract::Query(params): axum::extract::Query<ScheduleStateParams>,
     State(pool): State<SqlitePool>,
@@ -230,6 +235,7 @@ pub async fn get_host_schedules_api(
 
 /// API to get one schedule
 pub async fn get_one_schedule_api(
+    _claims: Claims,
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
 ) -> impl IntoResponse {
@@ -239,12 +245,16 @@ pub async fn get_one_schedule_api(
 }
 
 /// API to delete all schedules
-pub async fn delete_schedules_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
+pub async fn delete_schedules_api(
+    _claims: Claims,
+    State(pool): State<SqlitePool>,
+) -> impl IntoResponse {
     delete_schedules_from_db(None, pool.acquire().await.unwrap()).await
 }
 
 /// API to delete one schedule
 pub async fn delete_one_schedule_api(
+    _claims: Claims,
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
 ) -> impl IntoResponse {
@@ -254,6 +264,7 @@ pub async fn delete_one_schedule_api(
 
 /// API to create a new schedule
 pub async fn post_schedules_api(
+    _claims: Claims,
     State(pool): State<SqlitePool>,
     Json(payload): Json<Schedule>,
 ) -> Response {
@@ -279,6 +290,7 @@ pub async fn post_schedules_api(
 
 /// API to create a new schedule for this host
 pub async fn post_host_schedules_api(
+    _claims: Claims,
     Path(host_id): Path<Uuid>,
     State(pool): State<SqlitePool>,
     Json(mut payload): Json<Schedule>,
@@ -372,7 +384,9 @@ mod tests {
 
         let pool = create_database("sqlite::memory:").await.unwrap();
 
-        init_database(&pool).await.unwrap();
+        init_database(&pool, "foo@foo.foo".into(), "bar".into())
+            .await
+            .unwrap();
         let schedules = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(schedules.len(), 5);
 
@@ -441,10 +455,12 @@ mod tests {
             .unwrap_or(());
 
         let pool = create_database("sqlite::memory:").await.unwrap();
+        let claims: Claims = Claims::default();
+        init_database(&pool, "foo@foo.foo".into(), "bar".into())
+            .await
+            .unwrap();
 
-        init_database(&pool).await.unwrap();
-
-        let api_get_all = get_schedules_api(axum::extract::State(pool.clone()))
+        let api_get_all = get_schedules_api(claims.clone(), axum::extract::State(pool.clone()))
             .await
             .into_response();
         assert_eq!(api_get_all.status(), axum::http::StatusCode::OK);
@@ -459,6 +475,7 @@ mod tests {
         };
 
         let api_post = post_schedules_api(
+            claims.clone(),
             axum::extract::State(pool.clone()),
             Json(new_schedule.clone()),
         )
@@ -467,6 +484,7 @@ mod tests {
         assert_eq!(api_post.status(), axum::http::StatusCode::CREATED);
 
         let api_get_one = get_one_schedule_api(
+            claims.clone(),
             axum::extract::Path(new_schedule.id),
             axum::extract::State(pool.clone()),
         )
@@ -480,6 +498,7 @@ mod tests {
         let _host = host.insert_into_db(pool.acquire().await.unwrap()).await;
 
         let post_host_schedules_api = post_host_schedules_api(
+            claims.clone(),
             axum::extract::Path(host_id),
             axum::extract::State(pool.clone()),
             Json(new_schedule.clone()),
@@ -492,6 +511,7 @@ mod tests {
         );
 
         let get_host_schedules_api_all = get_host_schedules_api(
+            claims.clone(),
             axum::extract::Path(host_id),
             axum::extract::Query(ScheduleStateParams {
                 filter: Some(ScheduleState::All),
@@ -506,6 +526,7 @@ mod tests {
         );
 
         let get_host_schedules_api_inactive = get_host_schedules_api(
+            claims.clone(),
             axum::extract::Path(host_id),
             axum::extract::Query(ScheduleStateParams {
                 filter: Some(ScheduleState::Inactive),
@@ -520,6 +541,7 @@ mod tests {
         );
 
         let get_host_schedules_api_active = get_host_schedules_api(
+            claims.clone(),
             axum::extract::Path(host_id),
             axum::extract::Query(ScheduleStateParams {
                 filter: Some(ScheduleState::Active),
@@ -534,6 +556,7 @@ mod tests {
         );
 
         let api_del_one = delete_one_schedule_api(
+            claims.clone(),
             axum::extract::Path(new_schedule.id),
             axum::extract::State(pool.clone()),
         )
@@ -541,7 +564,7 @@ mod tests {
         .into_response();
         assert_eq!(api_del_one.status(), axum::http::StatusCode::OK);
 
-        let api_del_all = delete_schedules_api(axum::extract::State(pool.clone()))
+        let api_del_all = delete_schedules_api(claims.clone(), axum::extract::State(pool.clone()))
             .await
             .into_response();
         assert_eq!(api_del_all.status(), axum::http::StatusCode::OK);

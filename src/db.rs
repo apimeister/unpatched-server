@@ -58,7 +58,11 @@ pub async fn create_database(connection: &str) -> Result<SqlitePool, sqlx::Error
 /// * sample schedules
 ///
 /// More info: [DB.md](DB.md)
-pub async fn init_database(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+pub async fn init_database(
+    pool: &SqlitePool,
+    email: String,
+    password: String,
+) -> Result<(), sqlx::Error> {
     let _res = query(r#"PRAGMA foreign_keys = ON;"#)
         .execute(pool.acquire().await?.as_mut())
         .await?;
@@ -81,7 +85,7 @@ pub async fn init_database(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     }
     let user_count = user::count_rows(pool.acquire().await?).await?;
     if user_count == 0 {
-        init_main_user(pool).await
+        init_main_user(pool, email, password).await
     }
 
     Ok(())
@@ -374,9 +378,7 @@ async fn init_samples(pool: &Pool<Sqlite>) {
     }
 }
 
-async fn init_main_user(pool: &Pool<Sqlite>) {
-    let email = std::env::var("SUPERUSER").expect("SUPERUSER must be set");
-    let password = std::env::var("SUPERUSER_SECRET").expect("SUPERUSER_SECRET must be set");
+async fn init_main_user(pool: &Pool<Sqlite>, email: String, password: String) {
     let hashed_pw = hash_password(password.as_bytes()).unwrap();
     let new_user = User {
         email: EmailAddress::from_str(&email).unwrap(),
@@ -450,7 +452,9 @@ mod tests {
             .unwrap_or(());
 
         let pool = create_database("sqlite::memory:").await.unwrap();
-        init_database(&pool).await.unwrap();
+        init_database(&pool, "foo@foo.foo".into(), "bar".into())
+            .await
+            .unwrap();
 
         let tables = query("PRAGMA table_list;")
             .fetch_all(&mut *pool.acquire().await.unwrap())
@@ -459,7 +463,9 @@ mod tests {
         assert_eq!(tables.len(), 7);
 
         // run again to check already-present branch
-        init_database(&pool).await.unwrap();
+        init_database(&pool, "foo@foo.foo".into(), "bar".into())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -471,7 +477,9 @@ mod tests {
             .unwrap_or(());
 
         let pool = create_database("sqlite::memory:").await.unwrap();
-        init_database(&pool).await.unwrap();
+        init_database(&pool, "foo@foo.foo".into(), "bar".into())
+            .await
+            .unwrap();
 
         let up = update_text_field(
             Uuid::new_v4(),
@@ -500,7 +508,9 @@ mod tests {
             .unwrap_or(());
 
         let pool = create_database("sqlite::memory:").await.unwrap();
-        init_database(&pool).await.unwrap();
+        init_database(&pool, "foo@foo.foo".into(), "bar".into())
+            .await
+            .unwrap();
 
         let scripts = script::get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
         let schedules = schedule::get_schedules_from_db(None, pool.acquire().await.unwrap()).await;

@@ -14,7 +14,10 @@ use sqlx::{
 };
 use uuid::Uuid;
 
-use crate::db::{get_option, utc_from_str, utc_to_str};
+use crate::{
+    db::{get_option, utc_from_str, utc_to_str},
+    jwt::Claims,
+};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 pub struct Execution {
@@ -73,13 +76,17 @@ impl From<SqliteRow> for Execution {
 }
 
 /// API to get all executions
-pub async fn get_executions_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
+pub async fn get_executions_api(
+    _claims: Claims,
+    State(pool): State<SqlitePool>,
+) -> impl IntoResponse {
     let execution_vec = get_executions_from_db(None, pool.acquire().await.unwrap()).await;
     Json(execution_vec)
 }
 
 /// API to get all executions for host
 pub async fn get_host_executions_api(
+    _claims: Claims,
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
 ) -> impl IntoResponse {
@@ -90,6 +97,7 @@ pub async fn get_host_executions_api(
 
 /// API to get one execution
 pub async fn get_one_execution_api(
+    _claims: Claims,
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
 ) -> impl IntoResponse {
@@ -99,12 +107,16 @@ pub async fn get_one_execution_api(
 }
 
 /// API to delete all executions
-pub async fn delete_executions_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
+pub async fn delete_executions_api(
+    _claims: Claims,
+    State(pool): State<SqlitePool>,
+) -> impl IntoResponse {
     delete_executions_from_db(None, pool.acquire().await.unwrap()).await
 }
 
 /// API to delete one execution
 pub async fn delete_one_execution_api(
+    _claims: Claims,
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
 ) -> impl IntoResponse {
@@ -184,7 +196,9 @@ mod tests {
 
         let pool = create_database("sqlite::memory:").await.unwrap();
 
-        init_database(&pool).await.unwrap();
+        init_database(&pool, "foo@foo.foo".into(), "bar".into())
+            .await
+            .unwrap();
         let executions = get_executions_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(executions.len(), 0);
 
@@ -270,8 +284,10 @@ mod tests {
             .unwrap_or(());
 
         let pool = create_database("sqlite::memory:").await.unwrap();
-
-        init_database(&pool).await.unwrap();
+        let claims: Claims = Claims::default();
+        init_database(&pool, "foo@foo.foo".into(), "bar".into())
+            .await
+            .unwrap();
 
         // prepare a host to reference in the execution (nil_id)
         let host = Host::default();
@@ -299,12 +315,13 @@ mod tests {
             .await;
         assert_eq!(i1.rows_affected(), 1);
 
-        let api_get_all = get_executions_api(axum::extract::State(pool.clone()))
+        let api_get_all = get_executions_api(claims.clone(), axum::extract::State(pool.clone()))
             .await
             .into_response();
         assert_eq!(api_get_all.status(), axum::http::StatusCode::OK);
 
         let api_get_one = get_one_execution_api(
+            claims.clone(),
             axum::extract::Path(execution.id),
             axum::extract::State(pool.clone()),
         )
@@ -313,6 +330,7 @@ mod tests {
         assert_eq!(api_get_one.status(), axum::http::StatusCode::OK);
 
         let get_host_executions_api = get_host_executions_api(
+            claims.clone(),
             axum::extract::Path(host_id),
             axum::extract::State(pool.clone()),
         )
@@ -321,6 +339,7 @@ mod tests {
         assert_eq!(get_host_executions_api.status(), axum::http::StatusCode::OK);
 
         let api_del_one = delete_one_execution_api(
+            claims.clone(),
             axum::extract::Path(execution.id),
             axum::extract::State(pool.clone()),
         )
@@ -328,7 +347,7 @@ mod tests {
         .into_response();
         assert_eq!(api_del_one.status(), axum::http::StatusCode::OK);
 
-        let api_del_all = delete_executions_api(axum::extract::State(pool.clone()))
+        let api_del_all = delete_executions_api(claims.clone(), axum::extract::State(pool.clone()))
             .await
             .into_response();
         assert_eq!(api_del_all.status(), axum::http::StatusCode::OK);

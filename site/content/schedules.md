@@ -25,6 +25,7 @@ async function fetchScript(scriptId){
 }
 async function init(){
     let schedules = await fetch('/api/v1/schedules').then(r => r.json());
+    if (schedules.error == "Invalid token") { window.location.href = "/login" }
     console.log(schedules);
     let s = /*html*/`<div class="row">
         <div class="header col" style="border-top-left-radius:1em;">id</div>

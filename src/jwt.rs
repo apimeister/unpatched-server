@@ -3,32 +3,31 @@ use axum::{
     extract::{FromRequestParts, State, TypedHeader},
     headers::{authorization::Bearer, Authorization},
     http::{request::Parts, StatusCode},
-    response::{Html, IntoResponse, Response},
+    response::{IntoResponse, Response},
     Json, RequestPartsExt,
 };
-use chrono::{Utc, Days};
+use chrono::{Days, Utc};
 use email_address::EmailAddress;
 use headers::Cookie;
 
+use hyper::header::SET_COOKIE;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::SqlitePool;
-use tower::{Service, Layer};
-use std::{fmt::{Display}};
-use tracing::{info, error};
-use futures_util::task::Context;
-use futures_util::task::Poll;   
+use std::fmt::{Debug, Display};
+use tracing::error;
 use uuid::Uuid;
 
-use crate::{user::get_users_from_db};
+use crate::user::get_users_from_db;
 
 pub static KEYS: Lazy<Keys> = Lazy::new(|| {
     let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     Keys::new(secret.as_bytes())
 });
 
+//TODO: Remove or keep as test endpoint
 pub async fn protected(claims: Claims) -> Result<String, AuthError> {
     // Send the protected data to the user
     Ok(format!(
@@ -40,7 +39,7 @@ pub async fn protected(claims: Claims) -> Result<String, AuthError> {
 pub async fn api_authorize_user(
     State(pool): State<SqlitePool>,
     Json(payload): Json<AuthPayload>,
-) -> Result<Json<AuthBody>, AuthError> {
+) -> Result<Response, AuthError> {
     // Check if the user sent the credentials
     if payload.client_id.is_empty() || payload.client_secret.is_empty() {
         return Err(AuthError::MissingCredentials);
@@ -60,7 +59,10 @@ pub async fn api_authorize_user(
     let claims = Claims {
         sub: user.email.clone(),
         // FIXME: hardcoded value!
-        exp: Utc::now().checked_add_days(Days::new(30)).unwrap().timestamp() as usize,
+        exp: Utc::now()
+            .checked_add_days(Days::new(30))
+            .unwrap()
+            .timestamp() as usize,
         iss: "unpatched-server".to_string(),
         aud: "unpatched-server-users".to_string(),
         nbf: None,
@@ -70,9 +72,16 @@ pub async fn api_authorize_user(
     // Create the authorization token
     let token = encode(&Header::default(), &claims, &KEYS.encoding)
         .map_err(|_| AuthError::TokenCreation)?;
+    // Send the authorized token (as payload for apis and cookie header for webpage)
+    let body = Json(AuthBody::new(token.clone()));
+    let mut res = (StatusCode::OK, body).into_response();
+    let cookie = format!("unpatched_token={token}; SameSite=Strict; Secure; Path=/; HttpOnly; max-age=max-age-in-seconds=31536000");
+    res.headers_mut().insert(
+        SET_COOKIE,
+        cookie.parse().map_err(|_| AuthError::TokenCreation)?,
+    );
 
-    // Send the authorized token
-    Ok(Json(AuthBody::new(token)))
+    Ok(res)
 }
 
 impl Display for Claims {
@@ -117,17 +126,15 @@ where
                 .extract::<TypedHeader<Cookie>>()
                 .await
                 .map_err(|_| AuthError::InvalidToken)?;
-            info!("{:?}", cookies);
             let Some(coo) = cookies.get("unpatched_token") else {
                 return Err(AuthError::InvalidToken);
             };
-            info!("{:?}", coo);
             coo.to_string()
         } else {
             return Err(AuthError::InvalidToken);
         };
         // Decode the user data
-        let token_data = match decode::<Claims>(&token, &KEYS.decoding, &Validation::default()){
+        let token_data = match decode::<Claims>(&token, &KEYS.decoding, &Validation::default()) {
             Ok(a) => a,
             Err(e) => {
                 error!("{e}");
@@ -167,7 +174,7 @@ impl Keys {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 /// From https://auth0.com/docs/secure/tokens/json-web-tokens/json-web-token-claims#registered-claims
 ///
 /// The JWT specification defines seven reserved claims that are not required, but are recommended to allow interoperability with third-party applications. These are:
@@ -186,6 +193,20 @@ pub struct Claims {
     pub nbf: Option<usize>,
     pub iat: usize,
     pub jti: Uuid,
+}
+
+impl Default for Claims {
+    fn default() -> Self {
+        Claims {
+            iss: Default::default(),
+            sub: EmailAddress::new_unchecked("default@default.int"),
+            aud: Default::default(),
+            exp: Default::default(),
+            nbf: Default::default(),
+            iat: Default::default(),
+            jti: Default::default(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -208,143 +229,53 @@ pub enum AuthError {
     InvalidToken,
 }
 
-pub async fn login_ui() -> impl IntoResponse {
-    let html = r##"<!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta http-equiv="content-type" content="text/html; charset=utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
-        <title>Unpatched Server</title>
-        <!-- bootstrap -->
-        <link href="/bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-        <script src="/bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
-        <link rel="icon" href="/bandaid.svg">
-    </head>
-    <body>
-    <div class="container min-vh-100">
-    <div class="row align-items-center min-vh-100">
-    <div class="col"></div>
-    <div class="col-md-6">
-    <h1><i class="bi bi-bandaid"></i> Unpatched Server Login</h1>
-    <form>
-    <div class="form-outline mb-4">
-      <input type="email" id="loginEmail1" class="form-control" name="client_id" required />
-      <label class="form-label" for="loginEmail1">Email address</label>
-    </div>
-      <div class="form-outline mb-4">
-      <input type="password" id="loginPw1" class="form-control" name="client_secret" required />
-      <label class="form-label" for="loginPw1">Password</label>
-    </div>
-    <div class="row mb-4">
-      <div class="col d-flex justify-content-center">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="loginremember1" checked />
-          <label class="form-check-label" for="loginremember1"> Remember me (not implemented!)</label>
-        </div>
-      </div>
-      <div class="col">
-        <a href="#!">Forgot password? (not implemented!)</a>
-      </div>
-    </div>
-    <button type="button" class="btn btn-primary btn-block mb-4" onClick="login(this.form)">Sign in</button>
-    <div class="text-center">
-      <p>Not a member? (not implemented!)<a href="#!">Register</a></p>
-      <p>or sign up with: (not implemented!)</p>
-      <button type="button" class="btn btn-link btn-floating mx-1">
-        <i class="bi bi-facebook"></i>
-      </button>
-      <button type="button" class="btn btn-link btn-floating mx-1">
-        <i class="bi bi-google"></i>
-      </button>
-      <button type="button" class="btn btn-link btn-floating mx-1">
-        <i class="bi bi-twitter"></i>
-      </button>
-      <button type="button" class="btn btn-link btn-floating mx-1">
-        <i class="bi bi-github"></i>
-      </button>
-    </div>
-    </form>
-    </div>
-    <div class="col"></div>
-    </div></div>
-    </body>
-    <script>
-    async function login(form){
-        let formData = new FormData(form);
-        let formDataObject = Object.fromEntries(formData.entries());
-        let formDataJsonString = JSON.stringify(formDataObject);
-        console.log(formDataJsonString);
-        let fetchOptions = {
-            method: "POST",
-            headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            },
-            body: formDataJsonString,
-        };
-        let res = await fetch('/api/v1/authorize', fetchOptions);
-        if (!res.ok) {
-            let error = await res.text();
-            throw new Error(error);
-        } else {
-            res = await res.json()  
-        }
-        document.cookie = `unpatched_token=${res.access_token}; SameSite=Strict; Secure; max-age=max-age-in-seconds=31536000`;
-        window.location.href = "/protected";
-    }
-    </script>
-    </html>"##;
-    (StatusCode::OK, Html(html))
-}
-
 // FIXME: Make this work
 
-#[derive(Debug, Clone)]
-pub struct AuthLayer {
-    target: &'static str,
-}
+// #[derive(Debug, Clone)]
+// pub struct AuthLayer {
+//     target: &'static str,
+// }
 
-impl<S> Layer<S> for AuthLayer {
-    type Service = AuthService<S>;
+// impl<S> Layer<S> for AuthLayer {
+//     type Service = AuthService<S>;
 
-    fn layer(&self, service: S) -> Self::Service {
-        AuthService {
-            target: self.target,
-            service
-        }
-    }
-}
+//     fn layer(&self, service: S) -> Self::Service {
+//         AuthService {
+//             target: self.target,
+//             service,
+//         }
+//     }
+// }
 
-impl AuthLayer {
-    pub fn verify() -> Self {
-        error!("loaded auth layer");
-        AuthLayer { target: "auth" }
-    }
-}
-// This service implements the Log behavior
-#[derive(Clone)]
-pub struct AuthService<S> {
-    target: &'static str,
-    service: S,
-}
+// impl AuthLayer {
+//     pub fn verify() -> Self {
+//         error!("loaded auth layer");
+//         AuthLayer { target: "auth" }
+//     }
+// }
+// // This service implements the Log behavior
+// #[derive(Clone)]
+// pub struct AuthService<S> {
+//     target: &'static str,
+//     service: S,
+// }
 
-impl<S, Request> Service<Request> for AuthService<S>
-where
-    S: Service<Request>,
-    Request: std::fmt::Debug
-{
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = S::Future;
+// impl<S, Request> Service<Request> for AuthService<S>
+// where
+//     S: Service<Request>,
+//     Request: std::fmt::Debug,
+// {
+//     type Response = S::Response;
+//     type Error = S::Error;
+//     type Future = S::Future;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.service.poll_ready(cx)
-    }
+//     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+//         self.service.poll_ready(cx)
+//     }
 
-    fn call(&mut self, request: Request) -> Self::Future {
-        // Insert log statement here or other functionality
-        error!("request = {:?}, target = {:?}", request, self.target);
-        self.service.call(request)
-    }
-}
+//     fn call(&mut self, request: Request) -> Self::Future {
+//         // Insert log statement here or other functionality
+//         error!("request = {:?}, target = {:?}", request, self.target);
+//         self.service.call(request)
+//     }
+// }

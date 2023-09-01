@@ -5,14 +5,12 @@ use crate::{
     schedule::Timer,
 };
 
-
-
 use axum::{
     extract::connect_info::ConnectInfo,
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
     extract::State,
     http::StatusCode,
-    response::{IntoResponse},
+    response::IntoResponse,
     routing::{get, post},
     Error, Router,
 };
@@ -21,10 +19,10 @@ use chrono::{prelude::*, Days};
 use clap::Parser;
 use futures::{sink::SinkExt, stream::StreamExt};
 use futures_util::{future::join_all, stream::SplitSink};
-use headers::{HeaderMap};
+use headers::HeaderMap;
 use host::get_hosts_from_db;
 use include_dir::{include_dir, Dir};
-use jwt::{AuthLayer};
+// use jwt::AuthLayer;
 use once_cell::sync::OnceCell;
 use schedule::Schedule;
 use serde::{Deserialize, Serialize};
@@ -103,22 +101,24 @@ async fn main() {
     let pool = db::create_database(SQLITE_DB)
         .await
         .expect("Unable to create database connection!");
-    db::init_database(&pool)
+    let super_email = std::env::var("SUPERUSER").expect("SUPERUSER must be set");
+    let super_password = std::env::var("SUPERUSER_SECRET").expect("SUPERUSER_SECRET must be set");
+    db::init_database(&pool, super_email, super_password)
         .await
         .expect("Unable to initialize database!");
 
     // JWT init
     let _jwt = std::env::var("JWT_SECRET").expect("Environment Variable JWT_SECRET must be set");
-    
+
     // cron
     CRON.set(args.seven_part_cron)
         .expect("Error configuring cron format!");
-    
+
     // skip agent verification
     AUTOACC
         .set(args.auto_accept_agents)
         .expect("Error configuring auto_accept_agents!");
-    
+
     // Frontend
     let web_page = ServeDir::new(WEBPAGE.path().join("target").join("site"))
         .append_index_html_on_directories(true);
@@ -201,26 +201,7 @@ async fn main() {
         .route("/api", get(swagger::api_ui))
         .route("/api/v1", get(swagger::api_ui))
         .route("/api/api.yaml", get(swagger::api_def))
-        // .route_layer(AsyncRequireAuthorizationLayer::new(| req: Request<Body> | async move {
-        //     let headers = req.headers();
-        //     let TypedHeader(cookies) = headers.
-        //         .extract::<TypedHeader<Cookie>>()
-        //         .await;
-        //     let token = cookies.get("unpatched_token").unwrap();
-        //     // Decode the user data
-        //     match decode::<Claims>(&token, &KEYS.decoding, &Validation::default()){
-        //         Ok(_) => Ok(req.into()),
-        //         Err(_) => {
-        //             let unauthorized_response = Response::builder()
-        //             .status(StatusCode::UNAUTHORIZED)
-        //             .body(Body::empty())
-        //             .unwrap();
-        //             Err(unauthorized_response)
-        //         }
-        //     }  
-        // } ))
-        .route_layer(AuthLayer::verify())
-        .route("/login", get(jwt::login_ui))
+        // .route_layer(AuthLayer::verify())
         .route(
             "/api/v1/authorize",
             post(jwt::api_authorize_user).with_state(pool.clone()),
@@ -231,6 +212,7 @@ async fn main() {
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
         );
+
     let addr: SocketAddr = format!("{}:{}", args.bind, args.port).parse().unwrap();
 
     // spawn http or https depending on --no-tls

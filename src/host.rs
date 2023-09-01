@@ -296,9 +296,7 @@ mod tests {
 
         let pool = create_database("sqlite::memory:").await.unwrap();
 
-        init_database(&pool, "foo@foo.foo".into(), "bar".into())
-            .await
-            .unwrap();
+        init_database(&pool, None).await.unwrap();
         let hosts = get_hosts_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(hosts.len(), 0);
 
@@ -372,9 +370,7 @@ mod tests {
 
         let pool = create_database("sqlite::memory:").await.unwrap();
         let claims: Claims = Claims::default();
-        init_database(&pool, "foo@foo.foo".into(), "bar".into())
-            .await
-            .unwrap();
+        init_database(&pool, None).await.unwrap();
         let new_host = Host {
             id: Uuid::new_v4(),
             ..Default::default()

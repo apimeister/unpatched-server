@@ -118,9 +118,7 @@ mod tests {
 
         let pool = create_database("sqlite::memory:").await.unwrap();
 
-        init_database(&pool, "foo@foo.foo".into(), "bar".into())
-            .await
-            .unwrap();
+        init_database(&pool, None).await.unwrap();
 
         // init new testuser
         let password = b"test123";
@@ -135,7 +133,7 @@ mod tests {
         let _i1 = new_user.insert_into_db(pool.acquire().await.unwrap()).await;
         assert_eq!(
             count_rows(pool.acquire().await.unwrap()).await.unwrap_or(0),
-            2
+            1
         );
 
         // get testuser and verify pw

@@ -384,9 +384,7 @@ mod tests {
 
         let pool = create_database("sqlite::memory:").await.unwrap();
 
-        init_database(&pool, "foo@foo.foo".into(), "bar".into())
-            .await
-            .unwrap();
+        init_database(&pool, None).await.unwrap();
         let schedules = get_schedules_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(schedules.len(), 5);
 
@@ -456,9 +454,7 @@ mod tests {
 
         let pool = create_database("sqlite::memory:").await.unwrap();
         let claims: Claims = Claims::default();
-        init_database(&pool, "foo@foo.foo".into(), "bar".into())
-            .await
-            .unwrap();
+        init_database(&pool, None).await.unwrap();
 
         let api_get_all = get_schedules_api(claims.clone(), axum::extract::State(pool.clone()))
             .await

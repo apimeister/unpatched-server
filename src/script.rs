@@ -195,9 +195,7 @@ mod tests {
 
         let pool = create_database("sqlite::memory:").await.unwrap();
 
-        init_database(&pool, "foo@foo.foo".into(), "bar".into())
-            .await
-            .unwrap();
+        init_database(&pool, None).await.unwrap();
         let scripts = get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(scripts.len(), 4);
 
@@ -265,9 +263,7 @@ mod tests {
 
         let pool = create_database("sqlite::memory:").await.unwrap();
         let claims: Claims = Claims::default();
-        init_database(&pool, "foo@foo.foo".into(), "bar".into())
-            .await
-            .unwrap();
+        init_database(&pool, None).await.unwrap();
         let new_script = Script::default();
         let api_post = post_scripts_api(
             claims.clone(),

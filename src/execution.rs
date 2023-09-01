@@ -196,9 +196,7 @@ mod tests {
 
         let pool = create_database("sqlite::memory:").await.unwrap();
 
-        init_database(&pool, "foo@foo.foo".into(), "bar".into())
-            .await
-            .unwrap();
+        init_database(&pool, None).await.unwrap();
         let executions = get_executions_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(executions.len(), 0);
 
@@ -285,9 +283,7 @@ mod tests {
 
         let pool = create_database("sqlite::memory:").await.unwrap();
         let claims: Claims = Claims::default();
-        init_database(&pool, "foo@foo.foo".into(), "bar".into())
-            .await
-            .unwrap();
+        init_database(&pool, None).await.unwrap();
 
         // prepare a host to reference in the execution (nil_id)
         let host = Host::default();

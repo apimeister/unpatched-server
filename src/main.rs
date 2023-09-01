@@ -17,6 +17,7 @@ use axum::{
 use axum_server::tls_rustls::RustlsConfig;
 use chrono::{prelude::*, Days};
 use clap::Parser;
+use email_address::EmailAddress;
 use futures::{sink::SinkExt, stream::StreamExt};
 use futures_util::{future::join_all, stream::SplitSink};
 use headers::HeaderMap;
@@ -72,7 +73,6 @@ struct Args {
     no_tls: bool,
     /// auto-accept new agents
     #[arg(long)]
-    //FIXME: make this work!
     auto_accept_agents: bool,
     /// use 7 part instead of 5 part cron pattern
     #[arg(long)]
@@ -80,6 +80,12 @@ struct Args {
     /// Sets the certificate folder
     #[arg(long, value_name = "FOLDER", default_value = "./self-signed-certs")]
     cert_folder: PathBuf,
+    /// Email of first user to initialize the server with
+    #[arg(long)]
+    init_user: Option<EmailAddress>,
+    /// Password of first user to initialize the server with
+    #[arg(long)]
+    init_password: Option<String>,
 }
 
 const UPDATE_RATE: Duration = Duration::new(5, 0);
@@ -101,14 +107,14 @@ async fn main() {
     let pool = db::create_database(SQLITE_DB)
         .await
         .expect("Unable to create database connection!");
-    let super_email = std::env::var("SUPERUSER").expect("SUPERUSER must be set");
-    let super_password = std::env::var("SUPERUSER_SECRET").expect("SUPERUSER_SECRET must be set");
-    db::init_database(&pool, super_email, super_password)
+    let creds = if args.init_user.is_some() && args.init_password.is_some() {
+        Some((args.init_user.unwrap(), args.init_password.unwrap()))
+    } else {
+        None
+    };
+    db::init_database(&pool, creds)
         .await
         .expect("Unable to initialize database!");
-
-    // JWT init
-    let _jwt = std::env::var("JWT_SECRET").expect("Environment Variable JWT_SECRET must be set");
 
     // cron
     CRON.set(args.seven_part_cron)

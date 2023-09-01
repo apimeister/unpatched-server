@@ -26,8 +26,9 @@ use uuid::Uuid;
 use crate::user::get_users_from_db;
 
 pub static KEYS: Lazy<Keys> = Lazy::new(|| {
-    let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
-    Keys::new(secret.as_bytes())
+    let file = std::fs::read("jwt.pk8").unwrap();
+    let rsa_file: &[u8] = &file;
+    Keys::new(rsa_file)
 });
 
 //TODO: Remove or keep as test endpoint
@@ -75,8 +76,12 @@ pub async fn api_authorize_user(
         jti: Uuid::new_v4(),
     };
     // Create the authorization token
-    let token = encode(&Header::default(), &claims, &KEYS.encoding)
-        .map_err(|_| AuthError::TokenCreation)?;
+    let token = encode(
+        &Header::new(jsonwebtoken::Algorithm::RS256),
+        &claims,
+        &KEYS.encoding,
+    )
+    .map_err(|_| AuthError::TokenCreation)?;
     // Send the authorized token (as payload for apis and cookie header for webpage)
     let body = Json(AuthBody::new(token.clone()));
     let mut res = (StatusCode::OK, body).into_response();
@@ -172,10 +177,10 @@ pub struct Keys {
 }
 
 impl Keys {
-    fn new(secret: &[u8]) -> Self {
+    fn new(rsa_file: &[u8]) -> Self {
         Self {
-            encoding: EncodingKey::from_secret(secret),
-            decoding: DecodingKey::from_secret(secret),
+            encoding: EncodingKey::from_rsa_der(rsa_file),
+            decoding: DecodingKey::from_rsa_der(rsa_file),
         }
     }
 }

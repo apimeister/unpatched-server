@@ -16,7 +16,10 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::SqlitePool;
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    str::FromStr,
+};
 use tracing::error;
 use uuid::Uuid;
 
@@ -44,11 +47,13 @@ pub async fn api_authorize_user(
     if payload.client_id.is_empty() || payload.client_secret.is_empty() {
         return Err(AuthError::MissingCredentials);
     }
+    let _validate_email =
+        EmailAddress::from_str(&payload.client_id).map_err(|_| AuthError::InvalidEmail)?;
     // Here you can check the user credentials from a database
     let filter = format!("email='{}'", payload.client_id);
     let users = get_users_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
     let Some(user) = users.first() else {
-        return Err(AuthError::MissingCredentials);
+        return Err(AuthError::WrongCredentials);
     };
     if user
         .verify_password(payload.client_secret.as_bytes())
@@ -151,6 +156,7 @@ impl IntoResponse for AuthError {
             AuthError::WrongCredentials => (StatusCode::UNAUTHORIZED, "Wrong credentials"),
             AuthError::MissingCredentials => (StatusCode::BAD_REQUEST, "Missing credentials"),
             AuthError::TokenCreation => (StatusCode::INTERNAL_SERVER_ERROR, "Token creation error"),
+            AuthError::InvalidEmail => (StatusCode::NOT_ACCEPTABLE, "Not a valid email address"),
             AuthError::InvalidToken => (StatusCode::BAD_REQUEST, "Invalid token"),
         };
         let body = Json(json!({
@@ -227,6 +233,7 @@ pub enum AuthError {
     MissingCredentials,
     TokenCreation,
     InvalidToken,
+    InvalidEmail,
 }
 
 // FIXME: Make this work

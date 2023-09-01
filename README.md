@@ -28,7 +28,7 @@ Options:
    - look into server log
    - copy out agent id
    - go to `https://your-server.x/api` -> hosts -> approval
-   - past id and execute, your agent is now allowed to send data
+   - paste id and execute, your agent is now allowed to send data
 4. refresh to change data
 
 ## TLS

@@ -31,7 +31,7 @@ uuid = { version = "1.4", features = [ "v4", "fast-rng", "macro-diagnostics", "s
 hyper = "0.14"
 
 [build-dependencies]
-hugo-build = "0.117"
+hugo-build = "0.118"
 
 [[bin]]
 name = "unpatched-server"

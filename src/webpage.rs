@@ -18,9 +18,12 @@ pub async fn web_page(uri: Uri) -> impl IntoResponse {
     } else {
         header.insert("Content-Type", HeaderValue::from_static("text/plain"));
     }
+    println!("contains {}",crate::WEBPAGE.contains(&path));
+    println!("path {:?}",crate::WEBPAGE.get_entry(&path));
     let maybe_file = crate::WEBPAGE.get_file(path);
     match maybe_file {
         Some(file) => {
+            println!("found");
             return (StatusCode::OK, header, file.contents_utf8().unwrap());
         }
         None => {

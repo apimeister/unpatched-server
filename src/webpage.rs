@@ -15,7 +15,7 @@ pub async fn web_page(uri: Uri) -> impl IntoResponse {
     // fix content type
     if path.ends_with(".html") {
         header.insert("Content-Type", HeaderValue::from_static("text/html"));
-    } else if path.ends_with(".html") {
+    } else if path.ends_with(".css") {
         header.insert("Content-Type", HeaderValue::from_static("text/css"));
     } else if path.ends_with(".js") {
         header.insert("Content-Type", HeaderValue::from_static("text/javascript"));

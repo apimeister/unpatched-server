@@ -29,7 +29,7 @@ use once_cell::sync::OnceCell;
 use schedule::Schedule;
 use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolConnection, sqlite::SqlitePool, Sqlite};
-use std::{io::ErrorKind, path::PathBuf, time::Duration};
+use std::{io::ErrorKind, path::{PathBuf, Path}, time::Duration};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 use tower_http::{
@@ -134,7 +134,9 @@ async fn main() {
         println!("found {entry:?}");
     }
     // Frontend
-    let web_page = ServeDir::new(WEBPAGE.path()).append_index_html_on_directories(true);
+    let p = Path::new("/");
+    let p = p.join(WEBPAGE.path());
+    let web_page = ServeDir::new(p).append_index_html_on_directories(true);
 
     // build our application with some routes
     let app = Router::new()

@@ -222,6 +222,7 @@ async fn create_schedules_table(mut connection: PoolConnection<Sqlite>) -> Resul
 ///
 /// | Name | Type | Comment
 /// :--- | :--- | :---
+/// | id | TEXT | uuid
 /// | email | TEXT |
 /// | password | TEXT |
 /// | roles | TEXT |
@@ -231,11 +232,12 @@ async fn create_users_table(mut connection: PoolConnection<Sqlite>) -> Result<()
     let _res = query(
         r#"CREATE TABLE IF NOT EXISTS 
         users(
+            id TEXT NOT NULL,
             email TEXT PRIMARY KEY NOT NULL,
-            password TEXT,
+            password TEXT NOT NULL,
             roles TEXT,
-            active NUMERIC,
-            created TEXT
+            active NUMERIC NOT NULL,
+            created TEXT NOT NULL
         )"#,
     )
     .execute(&mut *connection)
@@ -384,9 +386,10 @@ async fn init_samples(pool: &Pool<Sqlite>) {
 async fn init_main_user(pool: &Pool<Sqlite>, email: EmailAddress, password: String) {
     let hashed_pw = hash_password(password.as_bytes()).unwrap();
     let new_user = User {
+        id: Uuid::new_v4(),
         email,
         password: hashed_pw,
-        roles: "".into(),
+        roles: vec!["admin".to_string()],
         active: true,
         created: Utc::now(),
     };

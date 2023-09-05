@@ -327,9 +327,10 @@ mod tests {
         let pool = create_database("sqlite::memory:").await.unwrap();
         init_database(&pool, None).await.unwrap();
         let new_user = User {
+            id: Uuid::new_v4(),
             email: EmailAddress::from_str("test@test.int").unwrap(),
             password: hash_password(b"test123").unwrap(),
-            roles: "".into(),
+            roles: vec!["test".into()],
             active: true,
             created: Utc::now(),
         };

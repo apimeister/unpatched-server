@@ -59,6 +59,7 @@
 
 | Name | Type | Comment
 :--- | :--- | :---
+| id | TEXT | uuid v4 hyphenated
 | email | TEXT |
 | password | TEXT |
 | roles | TEXT |

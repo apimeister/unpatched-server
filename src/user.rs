@@ -18,36 +18,41 @@ use crate::db::{utc_from_str, utc_to_str};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct User {
+    #[serde(default = "Uuid::new_v4")]
+    pub id: Uuid,
     pub email: EmailAddress,
     pub password: String,
-    pub roles: String,
+    pub roles: Vec<String>,
     pub active: bool,
     #[serde(default = "Utc::now")]
     pub created: DateTime<Utc>,
 }
 
 impl User {
-    /// Insert into or Replace `User` in users table in SQLite database
+    /// Insert `User` into users table in SQLite database
     ///
-    /// | Name | Type | Comment | Extended Comment
-    /// :--- | :--- | :--- | ---
+    /// | Name | Type | Comment
+    /// :--- | :--- | :---
+    /// | id | TEXT | uuid
     /// | email | TEXT | Email Address
     /// | password | TEXT |
     /// | roles | TEXT |
     /// | active | NUMERIC |
     /// | created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
-    pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        let q =
-            r#"REPLACE INTO users(email, password, roles, active, created) VALUES(?, ?, ?, ?, ?)"#;
+    pub async fn insert_into_db(
+        self,
+        mut connection: PoolConnection<Sqlite>,
+    ) -> Result<SqliteQueryResult, sqlx::Error> {
+        let q = r#"INSERT INTO users(id, email, password, roles, active, created) VALUES(?, ?, ?, ?, ?, ?)"#;
         query(q)
+            .bind(self.id.to_string())
             .bind(self.email.to_string())
             .bind(self.password)
-            .bind(self.roles)
+            .bind(serde_json::to_string(&self.roles).unwrap())
             .bind(self.active)
             .bind(utc_to_str(self.created))
             .execute(&mut *connection)
             .await
-            .unwrap()
     }
     pub fn verify_password(&self, password: &[u8]) -> Result<(), Error> {
         let parsed_hash = PasswordHash::new(&self.password)?;
@@ -69,9 +74,10 @@ pub fn hash_password(password: &[u8]) -> Result<String, Error> {
 impl From<SqliteRow> for User {
     fn from(s: SqliteRow) -> Self {
         User {
+            id: s.get::<String, _>("id").parse().unwrap(),
             email: EmailAddress::from_str(&s.get::<String, _>("email")).unwrap(),
-            password: s.get::<String, _>("password"),
-            roles: s.get::<String, _>("roles"),
+            password: "".into(),
+            roles: serde_json::from_str(&s.get::<String, _>("roles")).unwrap(),
             active: s.get::<bool, _>("active"),
             created: utc_from_str(&s.get::<String, _>("created")),
         }
@@ -124,9 +130,10 @@ mod tests {
         let password = b"test123";
         let hashed_pw = hash_password(password).unwrap();
         let new_user = User {
+            id: Uuid::new_v4(),
             email: EmailAddress::from_str("test@test.int").unwrap(),
             password: hashed_pw,
-            roles: "".into(),
+            roles: vec!["test".into()],
             active: true,
             created: Utc::now(),
         };

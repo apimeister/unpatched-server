@@ -393,7 +393,13 @@ async fn init_main_user(pool: &Pool<Sqlite>, email: EmailAddress, password: Stri
         active: true,
         created: Utc::now(),
     };
-    let user_res = new_user.insert_into_db(pool.acquire().await.unwrap()).await;
+    let user_res = match new_user.insert_into_db(pool.acquire().await.unwrap()).await {
+        Ok(r) => r,
+        Err(e) => {
+            error!("DB init: main user could not be loaded. Error:\n{e}");
+            return;
+        }
+    };
     if user_res.rows_affected() > 0 {
         info!("DB init: main user loaded");
     } else {

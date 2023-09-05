@@ -549,6 +549,121 @@ paths:
           description: Not a valid email address
         '500':
           description: Token creation error
+  /users:
+    get:
+      tags:
+        - users
+      summary: Get all users
+      responses:
+        '200':
+          description: Successful response containing a list of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+    delete:
+      tags:
+        - users
+      summary: Delete all users
+      responses:
+        '200':
+          description: All users deleted successfully
+        '403':
+          description: Forbidden (delete failed)
+    post:
+      tags:
+        - users
+      summary: Create a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        '400':
+          description: Bad request
+  /users/{id}:
+    get:
+      tags:
+        - users
+      summary: Get a single user by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the user to retrieve
+      responses:
+        '200':
+          description: Successful response containing the user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    patch:
+      tags:
+        - users
+      summary: Update a single user by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the user to delete
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+    delete:
+      tags:
+        - users
+      summary: Delete a single user by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the user to delete
+      responses:
+        '200':
+          description: User deleted successfully
+        '403':
+          description: Forbidden (delete failed)
 components:
   schemas:
     Execution:
@@ -666,3 +781,27 @@ components:
         script_content:
           type: string
           example: echo -c "Hello World"
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          writeOnly: true
+        active:
+          type: boolean
+        roles:
+          type: array
+          items:
+            type: string
+        created:
+          type: string
+          format: date-time
+          readOnly: true

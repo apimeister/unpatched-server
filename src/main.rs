@@ -208,6 +208,20 @@ async fn main() {
                 .post(schedule::post_schedules_api)
                 .with_state(pool.clone()),
         )
+        .route(
+            "/api/v1/users/:id",
+            get(user::get_one_user_api)
+                .patch(user::update_one_user_api)
+                .delete(user::delete_one_user_api)
+                .with_state(pool.clone()),
+        )
+        .route(
+            "/api/v1/users",
+            get(user::get_users_api)
+                .delete(user::delete_users_api)
+                .post(user::post_users_api)
+                .with_state(pool.clone()),
+        )
         // Swagger API
         .route("/api", get(swagger::api_ui))
         .route("/api/v1", get(swagger::api_ui))

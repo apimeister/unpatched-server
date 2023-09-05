@@ -136,6 +136,10 @@ mod tests {
             1
         );
 
+        // get all users
+        let users = get_users_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(users.len(), 1);
+
         // get testuser and verify pw
         let users =
             get_users_from_db(Some("email='test@test.int'"), pool.acquire().await.unwrap()).await;

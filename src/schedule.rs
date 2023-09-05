@@ -470,14 +470,26 @@ mod tests {
             ..Default::default()
         };
 
-        let api_post = post_schedules_api(
+        let api_post_success = post_schedules_api(
             claims.clone(),
             axum::extract::State(pool.clone()),
             Json(new_schedule.clone()),
         )
         .await
         .into_response();
-        assert_eq!(api_post.status(), axum::http::StatusCode::CREATED);
+        assert_eq!(api_post_success.status(), axum::http::StatusCode::CREATED);
+
+        let api_post_fail = post_schedules_api(
+            claims.clone(),
+            axum::extract::State(pool.clone()),
+            Json(Schedule {
+                script_id: Uuid::new_v4(),
+                ..Default::default()
+            }),
+        )
+        .await
+        .into_response();
+        assert_eq!(api_post_fail.status(), StatusCode::UNPROCESSABLE_ENTITY);
 
         let api_get_one = get_one_schedule_api(
             claims.clone(),
@@ -493,7 +505,7 @@ mod tests {
         let host_id = host.id;
         let _host = host.insert_into_db(pool.acquire().await.unwrap()).await;
 
-        let post_host_schedules_api = post_host_schedules_api(
+        let post_host_schedules_api_success = post_host_schedules_api(
             claims.clone(),
             axum::extract::Path(host_id),
             axum::extract::State(pool.clone()),
@@ -502,8 +514,24 @@ mod tests {
         .await
         .into_response();
         assert_eq!(
-            post_host_schedules_api.status(),
+            post_host_schedules_api_success.status(),
             axum::http::StatusCode::CREATED
+        );
+
+        let post_host_schedules_api_fail = post_host_schedules_api(
+            claims.clone(),
+            axum::extract::Path(host_id),
+            axum::extract::State(pool.clone()),
+            Json(Schedule {
+                script_id: Uuid::new_v4(),
+                ..Default::default()
+            }),
+        )
+        .await
+        .into_response();
+        assert_eq!(
+            post_host_schedules_api_fail.status(),
+            axum::http::StatusCode::UNPROCESSABLE_ENTITY
         );
 
         let get_host_schedules_api_all = get_host_schedules_api(

@@ -23,6 +23,7 @@ use futures_util::{future::join_all, stream::SplitSink};
 use headers::HeaderMap;
 use host::get_hosts_from_db;
 use include_dir::{include_dir, Dir};
+use jwt::KEYS;
 // use jwt::AuthLayer;
 use once_cell::sync::OnceCell;
 use schedule::Schedule;
@@ -125,6 +126,9 @@ async fn main() {
     AUTOACC
         .set(args.auto_accept_agents)
         .expect("Error configuring auto_accept_agents!");
+
+    // JWT secret
+    let _init_jwt = &KEYS;
 
     // Frontend
     let web_page = ServeDir::new(WEBPAGE.path().join("target").join("site"))
@@ -800,5 +804,54 @@ async fn generate_execution_timestamp(
             schedule::update_text_field(schedule.id, "active", "0".into(), connection).await;
             Some(*ts)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::db::{create_database, init_database};
+
+    use super::*;
+    use tracing_subscriber::{
+        fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
+    };
+
+    #[tokio::test]
+    async fn test_generate_execution_timestamp() {
+        registry()
+            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
+            .with(fmt::layer())
+            .try_init()
+            .unwrap_or(());
+
+        // prepare DB with user
+        let pool = create_database("sqlite::memory:").await.unwrap();
+        init_database(&pool, None).await.unwrap();
+
+        let schedule = Schedule {
+            timer: Timer::Cron("0 0 * * *".into()),
+            ..Default::default()
+        };
+        let exe =
+            generate_execution_timestamp(&schedule, pool.acquire().await.unwrap(), false).await;
+        assert!(exe.is_some());
+        assert_eq!(
+            format!("{}", exe.unwrap()),
+            format!(
+                "{} 00:00:00 UTC",
+                Utc::now()
+                    .date_naive()
+                    .checked_add_days(Days::new(1))
+                    .unwrap()
+            )
+        );
+
+        let schedule = Schedule {
+            timer: Timer::Cron("".into()),
+            ..Default::default()
+        };
+        let exe =
+            generate_execution_timestamp(&schedule, pool.acquire().await.unwrap(), false).await;
+        assert!(exe.is_none());
     }
 }

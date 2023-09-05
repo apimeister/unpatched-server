@@ -227,19 +227,19 @@ impl Default for Claims {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AuthBody {
     pub access_token: String,
     pub token_type: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default, Clone)]
 pub struct AuthPayload {
     pub client_id: String,
     pub client_secret: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum AuthError {
     WrongCredentials,
     MissingCredentials,
@@ -298,3 +298,139 @@ pub enum AuthError {
 //         self.service.call(request)
 //     }
 // }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use crate::{
+        db::{create_database, init_database},
+        user::{hash_password, User},
+    };
+    use hyper::{
+        header::{AUTHORIZATION, COOKIE},
+        Request,
+    };
+    use tracing_subscriber::{
+        fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
+    };
+
+    #[tokio::test]
+    async fn test_apis() {
+        registry()
+            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
+            .with(fmt::layer())
+            .try_init()
+            .unwrap_or(());
+
+        // prepare DB with user
+        let pool = create_database("sqlite::memory:").await.unwrap();
+        init_database(&pool, None).await.unwrap();
+        let new_user = User {
+            email: EmailAddress::from_str("test@test.int").unwrap(),
+            password: hash_password(b"test123").unwrap(),
+            roles: "".into(),
+            active: true,
+            created: Utc::now(),
+        };
+        let _i1 = new_user.insert_into_db(pool.acquire().await.unwrap()).await;
+        let payload = AuthPayload {
+            client_id: "test@test.int".into(),
+            client_secret: "test123".into(),
+        };
+        let auth =
+            api_authorize_user(axum::extract::State(pool.clone()), Json(payload.clone())).await;
+        assert_eq!(auth.unwrap().status(), axum::http::StatusCode::OK);
+        let auth = api_authorize_user(
+            axum::extract::State(pool.clone()),
+            Json(AuthPayload::default()),
+        )
+        .await;
+        assert_eq!(auth.as_ref().unwrap_err(), &AuthError::MissingCredentials);
+        assert_eq!(
+            auth.into_response().status(),
+            axum::http::StatusCode::BAD_REQUEST
+        );
+        let auth = api_authorize_user(
+            axum::extract::State(pool.clone()),
+            Json(AuthPayload {
+                client_id: "no@test.int".into(),
+                client_secret: "no".into(),
+            }),
+        )
+        .await;
+        assert_eq!(auth.as_ref().unwrap_err(), &AuthError::WrongCredentials);
+        assert_eq!(
+            auth.into_response().status(),
+            axum::http::StatusCode::UNAUTHORIZED
+        );
+        let auth = api_authorize_user(
+            axum::extract::State(pool.clone()),
+            Json(AuthPayload {
+                client_id: "no-test.int".into(),
+                client_secret: "no".into(),
+            }),
+        )
+        .await;
+        assert_eq!(auth.as_ref().unwrap_err(), &AuthError::InvalidEmail);
+        assert_eq!(
+            auth.into_response().status(),
+            axum::http::StatusCode::NOT_ACCEPTABLE
+        );
+
+        // JWT secret
+        let _init_jwt_new_file = &KEYS;
+        let _init_jwt_present = &KEYS;
+
+        let good_auth =
+            api_authorize_user(axum::extract::State(pool.clone()), Json(payload.clone()))
+                .await
+                .unwrap();
+        println!("{good_auth:?}");
+        let cookies = good_auth
+            .headers()
+            .get("set-cookie")
+            .unwrap()
+            .to_str()
+            .unwrap();
+        let req = Request::builder()
+            .uri("/")
+            .header(COOKIE, cookies)
+            .body(())
+            .unwrap();
+        let claim = Claims::from_request_parts(&mut req.into_parts().0, &axum::extract::State(()))
+            .await
+            .unwrap();
+        let prot = protected(claim.clone()).await;
+        assert_eq!(
+            prot.unwrap(),
+            format!("Welcome to the protected area :)\nYour data:\n{claim}")
+        );
+
+        let bad_req = Request::builder()
+            .uri("/")
+            .header(COOKIE, "")
+            .body(())
+            .unwrap();
+        let claim =
+            Claims::from_request_parts(&mut bad_req.into_parts().0, &axum::extract::State(()))
+                .await;
+        assert_eq!(claim.as_ref().unwrap_err(), &AuthError::InvalidToken);
+
+        let bytes = hyper::body::to_bytes(good_auth.into_body()).await.unwrap();
+        let bearer: AuthBody = serde_json::from_slice(&bytes).unwrap();
+        let req = Request::builder()
+            .uri("/")
+            .header(AUTHORIZATION, format!("Bearer {}", bearer.access_token))
+            .body(())
+            .unwrap();
+        let claim = Claims::from_request_parts(&mut req.into_parts().0, &axum::extract::State(()))
+            .await
+            .unwrap();
+        let prot = protected(claim.clone()).await;
+        assert_eq!(
+            prot.unwrap(),
+            format!("Welcome to the protected area :)\nYour data:\n{claim}")
+        );
+    }
+}

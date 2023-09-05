@@ -11,7 +11,7 @@ pub async fn web_page(uri: Uri) -> impl IntoResponse {
     } else {
         path.to_string()
     };
-    println!("got req: {path}");
+    tracing::trace!("got req: {path}");
     // fix content type
     if path.ends_with(".html") {
         header.insert("Content-Type", HeaderValue::from_static("text/html"));

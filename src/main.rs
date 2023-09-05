@@ -128,10 +128,6 @@ async fn main() {
     // JWT secret
     let _init_jwt = &KEYS;
 
-    for entry in WEBPAGE.entries() {
-        println!("found {entry:?}");
-    }
-
     // build our application with some routes
     let app = Router::new()
         .route("/protected", get(jwt::protected))

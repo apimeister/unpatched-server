@@ -42,8 +42,8 @@ hugo-build = "0.118"
 name = "unpatched-server"
 path = "src/main.rs"
 
-[profile.release]
-strip = true
-opt-level = "z"
-lto = true
-codegen-units = 1
+# [profile.release]
+# strip = true
+# opt-level = "z"
+# lto = true
+# codegen-units = 1

@@ -134,8 +134,7 @@ async fn main() {
         println!("found {entry:?}");
     }
     // Frontend
-    let web_page = ServeDir::new(WEBPAGE.path().join("target").join("site"))
-        .append_index_html_on_directories(true);
+    let web_page = ServeDir::new(WEBPAGE.path()).append_index_html_on_directories(true);
 
     // build our application with some routes
     let app = Router::new()

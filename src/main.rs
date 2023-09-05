@@ -29,17 +29,10 @@ use once_cell::sync::OnceCell;
 use schedule::Schedule;
 use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolConnection, sqlite::SqlitePool, Sqlite};
-use std::{
-    io::ErrorKind,
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{io::ErrorKind, path::PathBuf, time::Duration};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
-use tower_http::{
-    services::ServeDir,
-    trace::{DefaultMakeSpan, TraceLayer},
-};
+use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::{fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter};
 use uuid::Uuid;
@@ -52,6 +45,7 @@ mod schedule;
 mod script;
 mod swagger;
 mod user;
+mod webpage;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 struct ScriptExec {
@@ -137,14 +131,9 @@ async fn main() {
     for entry in WEBPAGE.entries() {
         println!("found {entry:?}");
     }
-    // Frontend
-    let p = Path::new("/");
-    let p = p.join(WEBPAGE.path());
-    let web_page = ServeDir::new(p).append_index_html_on_directories(true);
 
     // build our application with some routes
     let app = Router::new()
-        .fallback_service(web_page)
         .route("/protected", get(jwt::protected))
         .route(
             "/api/v1/executions/:id",
@@ -207,6 +196,7 @@ async fn main() {
         .route("/api/v1/authorize", post(jwt::api_authorize_user))
         // Websocket for Agents
         .route("/ws", get(ws_handler))
+        .fallback(webpage::web_page)
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),

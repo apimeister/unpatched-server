@@ -1,10 +1,23 @@
-use axum::response::IntoResponse;
+use axum::{http::HeaderValue, response::IntoResponse};
 use hyper::{HeaderMap, StatusCode, Uri};
 
 pub async fn web_page(uri: Uri) -> impl IntoResponse {
-    let header = HeaderMap::new();
-    let path = uri.path();
+    let mut header = HeaderMap::new();
+    let path = uri.path().strip_prefix('/').unwrap();
+    let path = if path.is_empty() {
+        "index.html".to_string()
+    } else if path.ends_with('/') {
+        format!("{path}/index.html")
+    } else {
+        path.to_string()
+    };
     println!("got req: {path}");
+    // fix content type
+    if path.ends_with(".html") {
+        header.insert("Content-Type", HeaderValue::from_static("text/html"));
+    } else {
+        header.insert("Content-Type", HeaderValue::from_static("text/plain"));
+    }
     let maybe_file = crate::WEBPAGE.get_file(path);
     match maybe_file {
         Some(file) => {

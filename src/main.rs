@@ -29,7 +29,11 @@ use once_cell::sync::OnceCell;
 use schedule::Schedule;
 use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolConnection, sqlite::SqlitePool, Sqlite};
-use std::{io::ErrorKind, path::{PathBuf, Path}, time::Duration};
+use std::{
+    io::ErrorKind,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 use tower_http::{

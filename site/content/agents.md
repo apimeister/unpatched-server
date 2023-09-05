@@ -38,6 +38,7 @@ const search = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" f
 </svg>`
 async function init(){
     let agents = await fetch('/api/v1/hosts').then(r=>r.json());
+    if (agents.error == "Invalid token") { window.location.href = "/login" }
     console.log(agents);
     let s = "";
     for(agent of agents){

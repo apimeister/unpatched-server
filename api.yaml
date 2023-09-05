@@ -509,7 +509,46 @@ paths:
         '200':
           description: Script deleted successfully
         '403':
-          description: Forbidden (delete failed)   
+          description: Forbidden (delete failed)
+  /authorize:
+    post:
+      tags:
+        - authorization
+      summary: Authorize user credentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                client_id:
+                  type: string
+                  format: email
+                client_secret:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  token_type:
+                    type: string
+                    example: Bearer
+        '400':
+          description: Missing credentials or Invalid token
+        '401':
+          description: Wrong credentials
+        '406':
+          description: Not a valid email address
+        '500':
+          description: Token creation error
 components:
   schemas:
     Execution:

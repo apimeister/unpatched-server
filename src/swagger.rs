@@ -4,8 +4,10 @@ use axum::{
 };
 use headers::{HeaderMap, HeaderValue};
 
+use crate::jwt::Claims;
+
 /// load swagger gui
-pub async fn api_ui() -> impl IntoResponse {
+pub async fn api_ui(_claims: Claims) -> impl IntoResponse {
     let html = r#"<!DOCTYPE html>
     <html lang="en">
     <head>
@@ -33,7 +35,7 @@ pub async fn api_ui() -> impl IntoResponse {
 }
 
 /// load api.yaml
-pub async fn api_def() -> impl IntoResponse {
+pub async fn api_def(_claims: Claims) -> impl IntoResponse {
     let spec = std::fs::read_to_string("api.yaml").unwrap();
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -54,13 +56,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_api_def() {
-        let api_def = api_def().await.into_response();
+        let claims = Claims::default();
+        let api_def = api_def(claims).await.into_response();
         assert_eq!(api_def.status(), axum::http::StatusCode::OK);
     }
 
     #[tokio::test]
     async fn test_api_ui() {
-        let api_ui = api_ui().await.into_response();
+        let claims = Claims::default();
+        let api_ui = api_ui(claims).await.into_response();
         assert_eq!(api_ui.status(), axum::http::StatusCode::OK);
     }
 }

@@ -11,3 +11,5 @@ lcov.info
 *.sql
 /self-signed-certs
 *.pem
+*.pk8
+*.secret

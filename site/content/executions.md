@@ -20,6 +20,7 @@ title: "Executions"
 <script>
 async function init(){
     let executions = await fetch('/api/v1/executions').then(r => r.json());
+    if (executions.error == "Invalid token") { window.location.href = "/login" }
     console.log(executions);
     let s = /*html*/`<div class="row">
         <div class="header col" style="border-top-left-radius:1em;">id</div>

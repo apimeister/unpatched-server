@@ -4,6 +4,7 @@ use crate::{
     host::{Host, ScheduleState},
     schedule::Timer,
 };
+
 use axum::{
     extract::connect_info::ConnectInfo,
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
@@ -16,11 +17,14 @@ use axum::{
 use axum_server::tls_rustls::RustlsConfig;
 use chrono::{prelude::*, Days};
 use clap::Parser;
+use email_address::EmailAddress;
 use futures::{sink::SinkExt, stream::StreamExt};
 use futures_util::{future::join_all, stream::SplitSink};
 use headers::HeaderMap;
 use host::get_hosts_from_db;
 use include_dir::{include_dir, Dir};
+use jwt::KEYS;
+// use jwt::AuthLayer;
 use once_cell::sync::OnceCell;
 use schedule::Schedule;
 use serde::{Deserialize, Serialize};
@@ -39,9 +43,11 @@ use uuid::Uuid;
 mod db;
 mod execution;
 mod host;
+mod jwt;
 mod schedule;
 mod script;
 mod swagger;
+mod user;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
 struct ScriptExec {
@@ -68,7 +74,6 @@ struct Args {
     no_tls: bool,
     /// auto-accept new agents
     #[arg(long)]
-    //FIXME: make this work!
     auto_accept_agents: bool,
     /// use 7 part instead of 5 part cron pattern
     #[arg(long)]
@@ -76,12 +81,19 @@ struct Args {
     /// Sets the certificate folder
     #[arg(long, value_name = "FOLDER", default_value = "./self-signed-certs")]
     cert_folder: PathBuf,
+    /// Email of first user to initialize the server with
+    #[arg(long)]
+    init_user: Option<EmailAddress>,
+    /// Password of first user to initialize the server with
+    #[arg(long)]
+    init_password: Option<String>,
 }
 
 const UPDATE_RATE: Duration = Duration::new(5, 0);
 const SQLITE_DB: &str = "sqlite:unpatched_server_internal.sqlite";
 const TLS_CERT: &str = "unpatched.server.crt";
 const TLS_KEY: &str = "unpatched.server.key";
+const JWT_SECRET: &str = "jwt.secret";
 
 static CRON: OnceCell<bool> = OnceCell::new();
 static AUTOACC: OnceCell<bool> = OnceCell::new();
@@ -97,7 +109,12 @@ async fn main() {
     let pool = db::create_database(SQLITE_DB)
         .await
         .expect("Unable to create database connection!");
-    db::init_database(&pool)
+    let creds = if args.init_user.is_some() && args.init_password.is_some() {
+        Some((args.init_user.unwrap(), args.init_password.unwrap()))
+    } else {
+        None
+    };
+    db::init_database(&pool, creds)
         .await
         .expect("Unable to initialize database!");
 
@@ -110,6 +127,9 @@ async fn main() {
         .set(args.auto_accept_agents)
         .expect("Error configuring auto_accept_agents!");
 
+    // JWT secret
+    let _init_jwt = &KEYS;
+
     // Frontend
     let web_page = ServeDir::new(WEBPAGE.path().join("target").join("site"))
         .append_index_html_on_directories(true);
@@ -117,6 +137,7 @@ async fn main() {
     // build our application with some routes
     let app = Router::new()
         .fallback_service(web_page)
+        .route("/protected", get(jwt::protected))
         .route(
             "/api/v1/executions/:id",
             get(execution::get_one_execution_api)
@@ -191,12 +212,18 @@ async fn main() {
         .route("/api", get(swagger::api_ui))
         .route("/api/v1", get(swagger::api_ui))
         .route("/api/api.yaml", get(swagger::api_def))
+        // .route_layer(AuthLayer::verify())
+        .route(
+            "/api/v1/authorize",
+            post(jwt::api_authorize_user).with_state(pool.clone()),
+        )
         // Websocket for Agents
         .route("/ws", get(ws_handler).with_state(pool.clone()))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
         );
+
     let addr: SocketAddr = format!("{}:{}", args.bind, args.port).parse().unwrap();
 
     // spawn http or https depending on --no-tls
@@ -777,5 +804,54 @@ async fn generate_execution_timestamp(
             schedule::update_text_field(schedule.id, "active", "0".into(), connection).await;
             Some(*ts)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::db::{create_database, init_database};
+
+    use super::*;
+    use tracing_subscriber::{
+        fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
+    };
+
+    #[tokio::test]
+    async fn test_generate_execution_timestamp() {
+        registry()
+            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
+            .with(fmt::layer())
+            .try_init()
+            .unwrap_or(());
+
+        // prepare DB with user
+        let pool = create_database("sqlite::memory:").await.unwrap();
+        init_database(&pool, None).await.unwrap();
+
+        let schedule = Schedule {
+            timer: Timer::Cron("0 0 * * *".into()),
+            ..Default::default()
+        };
+        let exe =
+            generate_execution_timestamp(&schedule, pool.acquire().await.unwrap(), false).await;
+        assert!(exe.is_some());
+        assert_eq!(
+            format!("{}", exe.unwrap()),
+            format!(
+                "{} 00:00:00 UTC",
+                Utc::now()
+                    .date_naive()
+                    .checked_add_days(Days::new(1))
+                    .unwrap()
+            )
+        );
+
+        let schedule = Schedule {
+            timer: Timer::Cron("".into()),
+            ..Default::default()
+        };
+        let exe =
+            generate_execution_timestamp(&schedule, pool.acquire().await.unwrap(), false).await;
+        assert!(exe.is_none());
     }
 }

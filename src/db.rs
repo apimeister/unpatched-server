@@ -3,8 +3,10 @@ use std::{str::FromStr, time::Duration};
 use crate::{
     schedule::{self, Schedule},
     script::{self, Script},
+    user::{self, hash_password, User},
 };
 use chrono::{DateTime, ParseError, Utc};
+use email_address::EmailAddress;
 use sqlx::{
     pool::PoolConnection,
     query,
@@ -56,7 +58,10 @@ pub async fn create_database(connection: &str) -> Result<SqlitePool, sqlx::Error
 /// * sample schedules
 ///
 /// More info: [DB.md](DB.md)
-pub async fn init_database(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+pub async fn init_database(
+    pool: &SqlitePool,
+    creds: Option<(EmailAddress, String)>,
+) -> Result<(), sqlx::Error> {
     let _res = query(r#"PRAGMA foreign_keys = ON;"#)
         .execute(pool.acquire().await?.as_mut())
         .await?;
@@ -65,6 +70,7 @@ pub async fn init_database(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     create_scripts_table(pool.acquire().await?).await?;
     create_executions_table(pool.acquire().await?).await?;
     create_schedules_table(pool.acquire().await?).await?;
+    create_users_table(pool.acquire().await?).await?;
     let tables = query("PRAGMA table_list;")
         .fetch_all(&mut *pool.acquire().await.unwrap())
         .await?;
@@ -76,6 +82,15 @@ pub async fn init_database(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     } else {
         debug!("DB init: script table or schedules table has data, samples not loaded");
     }
+    let user_count = user::count_rows(pool.acquire().await?).await?;
+    if user_count == 0 {
+        let Some((email, password)) = creds else {
+            warn!("No init user provided with empty database, skipping init user creation");
+            return Ok(());
+        };
+        init_main_user(pool, email, password).await
+    }
+
     Ok(())
 }
 
@@ -196,6 +211,31 @@ async fn create_schedules_table(mut connection: PoolConnection<Sqlite>) -> Resul
             active NUMERIC,
             FOREIGN KEY(script_id) REFERENCES scripts(id) ON DELETE CASCADE,
             FOREIGN KEY(target_host_id) REFERENCES hosts(id) ON DELETE CASCADE
+        )"#,
+    )
+    .execute(&mut *connection)
+    .await?;
+    Ok(())
+}
+
+/// Create Users Table in SQLite Database
+///
+/// | Name | Type | Comment
+/// :--- | :--- | :---
+/// | email | TEXT |
+/// | password | TEXT |
+/// | roles | TEXT |
+/// | active | NUMERIC |
+/// | created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
+async fn create_users_table(mut connection: PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
+    let _res = query(
+        r#"CREATE TABLE IF NOT EXISTS 
+        users(
+            email TEXT PRIMARY KEY NOT NULL,
+            password TEXT,
+            roles TEXT,
+            active NUMERIC,
+            created TEXT
         )"#,
     )
     .execute(&mut *connection)
@@ -341,6 +381,23 @@ async fn init_samples(pool: &Pool<Sqlite>) {
     }
 }
 
+async fn init_main_user(pool: &Pool<Sqlite>, email: EmailAddress, password: String) {
+    let hashed_pw = hash_password(password.as_bytes()).unwrap();
+    let new_user = User {
+        email,
+        password: hashed_pw,
+        roles: "".into(),
+        active: true,
+        created: Utc::now(),
+    };
+    let user_res = new_user.insert_into_db(pool.acquire().await.unwrap()).await;
+    if user_res.rows_affected() > 0 {
+        info!("DB init: main user loaded");
+    } else {
+        error!("DB init: main user could not be loaded");
+    }
+}
+
 pub async fn update_text_field(
     id: Uuid,
     column: &str,
@@ -351,7 +408,6 @@ pub async fn update_text_field(
     let stmt = format!("UPDATE {} SET {} = ? WHERE id = ?", table, column);
     match query(&stmt)
         .bind(data)
-        // extra quotes are needed since uuid.json results in "value" instead of value
         .bind(id.to_string())
         .execute(&mut *connection)
         .await
@@ -399,16 +455,24 @@ mod tests {
             .unwrap_or(());
 
         let pool = create_database("sqlite::memory:").await.unwrap();
-        init_database(&pool).await.unwrap();
+        init_database(&pool, None).await.unwrap();
 
         let tables = query("PRAGMA table_list;")
             .fetch_all(&mut *pool.acquire().await.unwrap())
             .await
             .unwrap();
-        assert_eq!(tables.len(), 6);
+        assert_eq!(tables.len(), 7);
 
         // run again to check already-present branch
-        init_database(&pool).await.unwrap();
+        init_database(
+            &pool,
+            Some((
+                EmailAddress::from_str("test@test.com").unwrap(),
+                "1234".into(),
+            )),
+        )
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -420,7 +484,7 @@ mod tests {
             .unwrap_or(());
 
         let pool = create_database("sqlite::memory:").await.unwrap();
-        init_database(&pool).await.unwrap();
+        init_database(&pool, None).await.unwrap();
 
         let up = update_text_field(
             Uuid::new_v4(),
@@ -449,7 +513,7 @@ mod tests {
             .unwrap_or(());
 
         let pool = create_database("sqlite::memory:").await.unwrap();
-        init_database(&pool).await.unwrap();
+        init_database(&pool, None).await.unwrap();
 
         let scripts = script::get_scripts_from_db(None, pool.acquire().await.unwrap()).await;
         let schedules = schedule::get_schedules_from_db(None, pool.acquire().await.unwrap()).await;

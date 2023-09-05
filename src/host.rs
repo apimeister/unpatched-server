@@ -19,6 +19,7 @@ use uuid::Uuid;
 
 use crate::{
     db::{try_utc_from_str, utc_to_str},
+    jwt::Claims,
     schedule::{self, Schedule, Target},
 };
 
@@ -121,13 +122,14 @@ impl From<SqliteRow> for Host {
 }
 
 /// API to get all hosts
-pub async fn get_hosts_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
+pub async fn get_hosts_api(_claims: Claims, State(pool): State<SqlitePool>) -> impl IntoResponse {
     let host_vec = get_hosts_from_db(None, pool.acquire().await.unwrap()).await;
     Json(host_vec)
 }
 
 /// API to get one host
 pub async fn get_one_host_api(
+    _claims: Claims,
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
 ) -> impl IntoResponse {
@@ -138,6 +140,7 @@ pub async fn get_one_host_api(
 
 /// API to approve host
 pub async fn approve_one_host_api(
+    _claims: Claims,
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
 ) -> impl IntoResponse {
@@ -161,6 +164,7 @@ pub async fn approve_one_host_api(
 
 /// API to lock host
 pub async fn lock_one_host_api(
+    _claims: Claims,
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
 ) -> impl IntoResponse {
@@ -175,12 +179,16 @@ pub async fn lock_one_host_api(
 }
 
 /// API to delete all hosts
-pub async fn delete_hosts_api(State(pool): State<SqlitePool>) -> impl IntoResponse {
+pub async fn delete_hosts_api(
+    _claims: Claims,
+    State(pool): State<SqlitePool>,
+) -> impl IntoResponse {
     delete_hosts_from_db(None, pool.acquire().await.unwrap()).await
 }
 
 /// API to delete one host
 pub async fn delete_one_host_api(
+    _claims: Claims,
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
 ) -> impl IntoResponse {
@@ -190,6 +198,7 @@ pub async fn delete_one_host_api(
 
 /// API to create a new host
 pub async fn post_hosts_api(
+    _claims: Claims,
     State(pool): State<SqlitePool>,
     Json(payload): Json<Host>,
 ) -> impl IntoResponse {
@@ -205,6 +214,7 @@ pub async fn post_hosts_api(
 
 /// API to update one host
 pub async fn update_one_host_api(
+    _claims: Claims,
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
     Json(payload): Json<HashMap<String, String>>,
@@ -286,7 +296,7 @@ mod tests {
 
         let pool = create_database("sqlite::memory:").await.unwrap();
 
-        init_database(&pool).await.unwrap();
+        init_database(&pool, None).await.unwrap();
         let hosts = get_hosts_from_db(None, pool.acquire().await.unwrap()).await;
         assert_eq!(hosts.len(), 0);
 
@@ -359,22 +369,27 @@ mod tests {
             .unwrap_or(());
 
         let pool = create_database("sqlite::memory:").await.unwrap();
-
-        init_database(&pool).await.unwrap();
+        let claims: Claims = Claims::default();
+        init_database(&pool, None).await.unwrap();
         let new_host = Host {
             id: Uuid::new_v4(),
             ..Default::default()
         };
 
-        let api_post = post_hosts_api(axum::extract::State(pool.clone()), Json(new_host.clone()))
-            .await
-            .into_response();
+        let api_post = post_hosts_api(
+            claims.clone(),
+            axum::extract::State(pool.clone()),
+            Json(new_host.clone()),
+        )
+        .await
+        .into_response();
         assert_eq!(api_post.status(), axum::http::StatusCode::CREATED);
 
         let mut api_update = HashMap::new();
         api_update.insert("last_pong".to_string(), utc_to_str(Utc::now()));
 
         let api_update = update_one_host_api(
+            claims.clone(),
             axum::extract::Path(new_host.id),
             axum::extract::State(pool.clone()),
             Json(api_update),
@@ -384,6 +399,7 @@ mod tests {
         assert_eq!(api_update.status(), axum::http::StatusCode::OK);
 
         let lock_host = lock_one_host_api(
+            claims.clone(),
             axum::extract::Path(new_host.id),
             axum::extract::State(pool.clone()),
         )
@@ -392,6 +408,7 @@ mod tests {
         assert_eq!(lock_host.status(), axum::http::StatusCode::OK);
 
         let approve_host = approve_one_host_api(
+            claims.clone(),
             axum::extract::Path(new_host.id),
             axum::extract::State(pool.clone()),
         )
@@ -399,12 +416,13 @@ mod tests {
         .into_response();
         assert_eq!(approve_host.status(), axum::http::StatusCode::OK);
 
-        let api_get_all = get_hosts_api(axum::extract::State(pool.clone()))
+        let api_get_all = get_hosts_api(claims.clone(), axum::extract::State(pool.clone()))
             .await
             .into_response();
         assert_eq!(api_get_all.status(), axum::http::StatusCode::OK);
 
         let api_get_one = get_one_host_api(
+            claims.clone(),
             axum::extract::Path(new_host.id),
             axum::extract::State(pool.clone()),
         )
@@ -413,6 +431,7 @@ mod tests {
         assert_eq!(api_get_one.status(), axum::http::StatusCode::OK);
 
         let api_del_one = delete_one_host_api(
+            claims.clone(),
             axum::extract::Path(new_host.id),
             axum::extract::State(pool.clone()),
         )
@@ -420,7 +439,7 @@ mod tests {
         .into_response();
         assert_eq!(api_del_one.status(), axum::http::StatusCode::OK);
 
-        let api_del_all = delete_hosts_api(axum::extract::State(pool.clone()))
+        let api_del_all = delete_hosts_api(claims.clone(), axum::extract::State(pool.clone()))
             .await
             .into_response();
         assert_eq!(api_del_all.status(), axum::http::StatusCode::OK);

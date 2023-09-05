@@ -87,7 +87,7 @@ impl From<SqliteRow> for User {
         User {
             id: s.get::<String, _>("id").parse().unwrap(),
             email: EmailAddress::from_str(&s.get::<String, _>("email")).unwrap(),
-            password: "".into(),
+            password: s.get::<String, _>("password"),
             roles: serde_json::from_str(&s.get::<String, _>("roles")).unwrap(),
             active: s.get::<bool, _>("active"),
             created: utc_from_str(&s.get::<String, _>("created")),

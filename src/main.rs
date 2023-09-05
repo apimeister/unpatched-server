@@ -130,6 +130,9 @@ async fn main() {
     // JWT secret
     let _init_jwt = &KEYS;
 
+    for entry in WEBPAGE.entries() {
+        println!("found {entry:?}");
+    }
     // Frontend
     let web_page = ServeDir::new(WEBPAGE.path().join("target").join("site"))
         .append_index_html_on_directories(true);

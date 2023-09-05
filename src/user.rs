@@ -99,51 +99,51 @@ pub async fn count_rows(connection: PoolConnection<Sqlite>) -> Result<i64, sqlx:
     crate::db::count_rows("users", connection).await
 }
 
-#[cfg(test)]
-mod tests {
+// #[cfg(test)]
+// mod tests {
 
-    use super::*;
-    use crate::db::{create_database, init_database};
-    use tracing_subscriber::{
-        fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
-    };
+//     use super::*;
+//     use crate::db::{create_database, init_database};
+//     use tracing_subscriber::{
+//         fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
+//     };
 
-    // #[tokio::test]
-    // async fn test_users() {
-    //     registry()
-    //         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
-    //         .with(fmt::layer())
-    //         .try_init()
-    //         .unwrap_or(());
+//     #[tokio::test]
+//     async fn test_users() {
+//         registry()
+//             .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
+//             .with(fmt::layer())
+//             .try_init()
+//             .unwrap_or(());
 
-    //     let pool = create_database("sqlite::memory:").await.unwrap();
+//         let pool = create_database("sqlite::memory:").await.unwrap();
 
-    //     init_database(&pool, None).await.unwrap();
+//         init_database(&pool, None).await.unwrap();
 
-    //     // init new testuser
-    //     let password = b"test123";
-    //     let hashed_pw = hash_password(password).unwrap();
-    //     let new_user = User {
-    //         email: EmailAddress::from_str("test@test.int").unwrap(),
-    //         password: hashed_pw,
-    //         roles: "".into(),
-    //         active: true,
-    //         created: Utc::now(),
-    //     };
-    //     let _i1 = new_user.insert_into_db(pool.acquire().await.unwrap()).await;
-    //     assert_eq!(
-    //         count_rows(pool.acquire().await.unwrap()).await.unwrap_or(0),
-    //         1
-    //     );
+//         // init new testuser
+//         let password = b"test123";
+//         let hashed_pw = hash_password(password).unwrap();
+//         let new_user = User {
+//             email: EmailAddress::from_str("test@test.int").unwrap(),
+//             password: hashed_pw,
+//             roles: "".into(),
+//             active: true,
+//             created: Utc::now(),
+//         };
+//         let _i1 = new_user.insert_into_db(pool.acquire().await.unwrap()).await;
+//         assert_eq!(
+//             count_rows(pool.acquire().await.unwrap()).await.unwrap_or(0),
+//             1
+//         );
 
-    //     // get all users
-    //     let users = get_users_from_db(None, pool.acquire().await.unwrap()).await;
-    //     assert_eq!(users.len(), 1);
+//         // get all users
+//         let users = get_users_from_db(None, pool.acquire().await.unwrap()).await;
+//         assert_eq!(users.len(), 1);
 
-    //     // get testuser and verify pw
-    //     let users =
-    //         get_users_from_db(Some("email='test@test.int'"), pool.acquire().await.unwrap()).await;
-    //     let user = users.first().unwrap();
-    //     assert!(user.verify_password(password).is_ok());
-    // }
-}
+//         // get testuser and verify pw
+//         let users =
+//             get_users_from_db(Some("email='test@test.int'"), pool.acquire().await.unwrap()).await;
+//         let user = users.first().unwrap();
+//         assert!(user.verify_password(password).is_ok());
+//     }
+// }

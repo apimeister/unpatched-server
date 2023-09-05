@@ -2657,6 +2657,7 @@ dependencies = [
  "include_dir",
  "jsonwebtoken",
  "once_cell",
+ "rand",
  "serde",
  "serde_json",
  "sqlx",

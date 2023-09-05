@@ -13,6 +13,7 @@ use headers::Cookie;
 use hyper::header::SET_COOKIE;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use once_cell::sync::Lazy;
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::SqlitePool;
@@ -20,15 +21,25 @@ use std::{
     fmt::{Debug, Display},
     str::FromStr,
 };
-use tracing::error;
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
-use crate::user::get_users_from_db;
+use crate::{user::get_users_from_db, JWT_SECRET};
 
 pub static KEYS: Lazy<Keys> = Lazy::new(|| {
-    let file = std::fs::read("jwt.pk8").unwrap();
-    let rsa_file: &[u8] = &file;
-    Keys::new(rsa_file)
+    let sec = std::fs::read(JWT_SECRET).unwrap_or_else(|_| {
+        info!("{JWT_SECRET} not found, generating new secret");
+        let secret: String = thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(64)
+        .map(char::from)
+        .collect();
+        if let Err(e) = std::fs::write(JWT_SECRET, &secret) {
+            warn!("{JWT_SECRET} could not be saved on filesystem, server will get a new {JWT_SECRET} each restart. Error:\n{e}");
+        };
+        secret.into()
+    });
+    Keys::new(&sec)
 });
 
 //TODO: Remove or keep as test endpoint
@@ -76,12 +87,8 @@ pub async fn api_authorize_user(
         jti: Uuid::new_v4(),
     };
     // Create the authorization token
-    let token = encode(
-        &Header::new(jsonwebtoken::Algorithm::RS256),
-        &claims,
-        &KEYS.encoding,
-    )
-    .map_err(|_| AuthError::TokenCreation)?;
+    let token = encode(&Header::default(), &claims, &KEYS.encoding)
+        .map_err(|_| AuthError::TokenCreation)?;
     // Send the authorized token (as payload for apis and cookie header for webpage)
     let body = Json(AuthBody::new(token.clone()));
     let mut res = (StatusCode::OK, body).into_response();
@@ -177,10 +184,10 @@ pub struct Keys {
 }
 
 impl Keys {
-    fn new(rsa_file: &[u8]) -> Self {
+    fn new(secret: &[u8]) -> Self {
         Self {
-            encoding: EncodingKey::from_rsa_der(rsa_file),
-            decoding: DecodingKey::from_rsa_der(rsa_file),
+            encoding: EncodingKey::from_secret(secret),
+            decoding: DecodingKey::from_secret(secret),
         }
     }
 }

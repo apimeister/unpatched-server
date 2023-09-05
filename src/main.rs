@@ -92,6 +92,7 @@ const UPDATE_RATE: Duration = Duration::new(5, 0);
 const SQLITE_DB: &str = "sqlite:unpatched_server_internal.sqlite";
 const TLS_CERT: &str = "unpatched.server.crt";
 const TLS_KEY: &str = "unpatched.server.key";
+const JWT_SECRET: &str = "jwt.secret";
 
 static CRON: OnceCell<bool> = OnceCell::new();
 static AUTOACC: OnceCell<bool> = OnceCell::new();

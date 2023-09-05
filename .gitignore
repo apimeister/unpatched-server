@@ -12,3 +12,4 @@ lcov.info
 /self-signed-certs
 *.pem
 *.pk8
+*.secret

@@ -140,89 +140,70 @@ async fn main() {
         .route("/protected", get(jwt::protected))
         .route(
             "/api/v1/executions/:id",
-            get(execution::get_one_execution_api)
-                .delete(execution::delete_one_execution_api)
-                .with_state(pool.clone()),
+            get(execution::get_one_execution_api).delete(execution::delete_one_execution_api),
         )
         .route(
             "/api/v1/executions",
-            get(execution::get_executions_api)
-                .delete(execution::delete_executions_api)
-                .with_state(pool.clone()),
+            get(execution::get_executions_api).delete(execution::delete_executions_api),
         )
         .route(
             "/api/v1/scripts/:id",
-            get(script::get_one_script_api)
-                .delete(script::delete_one_script_api)
-                .with_state(pool.clone()),
+            get(script::get_one_script_api).delete(script::delete_one_script_api),
         )
         .route(
             "/api/v1/scripts",
             get(script::get_scripts_api)
                 .delete(script::delete_scripts_api)
-                .post(script::post_scripts_api)
-                .with_state(pool.clone()),
+                .post(script::post_scripts_api),
         )
         .route(
             "/api/v1/hosts/:id/approve",
-            post(host::approve_one_host_api).with_state(pool.clone()),
+            post(host::approve_one_host_api),
         )
-        .route(
-            "/api/v1/hosts/:id/lock",
-            post(host::lock_one_host_api).with_state(pool.clone()),
-        )
+        .route("/api/v1/hosts/:id/lock", post(host::lock_one_host_api))
         .route(
             "/api/v1/hosts/:id/schedules",
-            get(schedule::get_host_schedules_api)
-                .post(schedule::post_host_schedules_api)
-                .with_state(pool.clone()),
+            get(schedule::get_host_schedules_api).post(schedule::post_host_schedules_api),
         )
         .route(
             "/api/v1/hosts/:id/executions",
-            get(execution::get_host_executions_api).with_state(pool.clone()),
+            get(execution::get_host_executions_api),
         )
         .route(
             "/api/v1/hosts/:id",
             get(host::get_one_host_api)
                 .patch(host::update_one_host_api)
-                .delete(host::delete_one_host_api)
-                .with_state(pool.clone()),
+                .delete(host::delete_one_host_api),
         )
         .route(
             "/api/v1/hosts",
             get(host::get_hosts_api)
                 .delete(host::delete_hosts_api)
-                .post(host::post_hosts_api)
-                .with_state(pool.clone()),
+                .post(host::post_hosts_api),
         )
         .route(
             "/api/v1/schedules/:id",
-            get(schedule::get_one_schedule_api)
-                .delete(schedule::delete_one_schedule_api)
-                .with_state(pool.clone()),
+            get(schedule::get_one_schedule_api).delete(schedule::delete_one_schedule_api),
         )
         .route(
             "/api/v1/schedules",
             get(schedule::get_schedules_api)
                 .delete(schedule::delete_schedules_api)
-                .post(schedule::post_schedules_api)
-                .with_state(pool.clone()),
+                .post(schedule::post_schedules_api),
         )
         // Swagger API
         .route("/api", get(swagger::api_ui))
         .route("/api/v1", get(swagger::api_ui))
         .route("/api/api.yaml", get(swagger::api_def))
         // .route_layer(AuthLayer::verify())
-        .route(
-            "/api/v1/authorize",
-            post(jwt::api_authorize_user).with_state(pool.clone()),
-        )
+        .route("/api/v1/authorize", post(jwt::api_authorize_user))
         // Websocket for Agents
-        .route("/ws", get(ws_handler).with_state(pool.clone()))
+        .route("/ws", get(ws_handler))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
-        );
+        )
+        .with_state(pool.clone());
 
     let addr: SocketAddr = format!("{}:{}", args.bind, args.port).parse().unwrap();
 

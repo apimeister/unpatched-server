@@ -26,7 +26,7 @@ async function approve(id){
         let error = await res.text();
         throw new Error(error);
     }
-    return res.json();
+    location.reload();
 }
 const nodeplus = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard2-plus" viewBox="0 0 16 16">
   <path d="M9.5 0a.5.5 0 0 1 .5.5.5.5 0 0 0 .5.5.5.5 0 0 1 .5.5V2a.5.5 0 0 1-.5.5h-5A.5.5 0 0 1 5 2v-.5a.5.5 0 0 1 .5-.5.5.5 0 0 0 .5-.5.5.5 0 0 1 .5-.5h3Z"/>
@@ -51,7 +51,7 @@ async function init(){
         if (agent.api_key) {
                 approve_button =/*html*/`<button type="button" class="btn btn-success btn-sm float-end invisible">Approve</button>`;
             } else {
-                approve_button =/*html*/`<button type="button" class="btn btn-success btn-sm float-end" onClick="await approve(agent.id)">Approve</button>`;
+                approve_button =/*html*/`<button type="button" class="btn btn-success btn-sm float-end" onClick="approve(agent.id)">Approve</button>`;
         }
         s += /*html*/`<div class="card ms-2 me-2" style="width:25em;">
         <div class="card-header">

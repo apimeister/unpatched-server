@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     Json,
 };
-use chrono::{DateTime, Days, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{
     pool::PoolConnection,
@@ -18,7 +18,7 @@ use tracing::debug;
 use uuid::Uuid;
 
 use crate::{
-    db::{try_utc_from_str, utc_to_str},
+    db::{try_utc_from_str, utc_from_str, utc_to_str},
     jwt::Claims,
     schedule::{self, Schedule, Target},
 };
@@ -28,11 +28,13 @@ pub struct Host {
     pub id: Uuid,
     pub alias: String,
     pub attributes: Vec<String>,
+    #[serde(default)]
     pub ip: String,
-    pub seed_key: Uuid,
-    pub api_key: Option<Uuid>,
-    pub api_key_ttl: Option<DateTime<Utc>>,
-    pub last_pong: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub active: bool,
+    pub last_checkin: Option<DateTime<Utc>>,
+    #[serde(default = "Utc::now")]
+    pub created: DateTime<Utc>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
@@ -53,18 +55,18 @@ impl Host {
     /// | alias | TEXT | host alias (name) |
     /// | attributes | TEXT | host labels |
     /// | ip | TEXT | host ip:port |
-    /// | seed_key | TEXT | uuid
-    /// | api_key | TEXT | uuid | implemented by another call, always created as NULL
-    /// | api_key_ttl | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ") | implemented by another call, always created as NULL
-    /// | last_pong | TEXT | last checkin from agent | implemented by another call, always created as NULL
+    /// | active | NUMERIC |
+    /// | last_checkin | TEXT | last checkin from agent | implemented by another call, always created as NULL
+    /// | created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
     pub async fn insert_into_db(self, mut connection: PoolConnection<Sqlite>) -> SqliteQueryResult {
-        let q = r#"REPLACE INTO hosts(id, alias, attributes, seed_key, ip) VALUES(?, ?, ?, ?, ?)"#;
+        let q = r#"REPLACE INTO hosts(id, alias, attributes, ip, active, created) VALUES(?, ?, ?, ?, ?, ?)"#;
         query(q)
             .bind(self.id.to_string())
             .bind(self.alias)
             .bind(serde_json::to_string(&self.attributes).unwrap())
-            .bind(self.seed_key.to_string())
             .bind(self.ip)
+            .bind(self.active)
+            .bind(utc_to_str(self.created))
             .execute(&mut *connection)
             .await
             .unwrap()
@@ -113,10 +115,9 @@ impl From<SqliteRow> for Host {
             alias: s.get::<String, _>("alias"),
             attributes: serde_json::from_str(&s.get::<String, _>("attributes")).unwrap(),
             ip: s.get::<String, _>("ip"),
-            seed_key: s.get::<String, _>("seed_key").parse().unwrap(),
-            api_key: s.get::<String, _>("api_key").parse().ok(),
-            api_key_ttl: try_utc_from_str(&s.get::<String, _>("api_key_ttl")).ok(),
-            last_pong: try_utc_from_str(&s.get::<String, _>("last_pong")).ok(),
+            active: s.get::<bool, _>("active"),
+            last_checkin: try_utc_from_str(&s.get::<String, _>("last_checkin")).ok(),
+            created: utc_from_str(&s.get::<String, _>("created")),
         }
     }
 }
@@ -138,43 +139,13 @@ pub async fn get_one_host_api(
     Json(host_vec.first().cloned())
 }
 
-/// API to approve host
-pub async fn approve_one_host_api(
+/// API to deactive host
+pub async fn deactivate_one_host_api(
     _claims: Claims,
     Path(id): Path<Uuid>,
     State(pool): State<SqlitePool>,
 ) -> impl IntoResponse {
-    let ttl = Utc::now().checked_add_days(Days::new(30)).unwrap();
-    let _up = update_text_field(
-        id,
-        "api_key",
-        Uuid::new_v4().to_string(),
-        pool.acquire().await.unwrap(),
-    )
-    .await;
-    let _up = update_text_field(
-        id,
-        "api_key_ttl",
-        utc_to_str(ttl),
-        pool.acquire().await.unwrap(),
-    )
-    .await;
-    StatusCode::OK
-}
-
-/// API to lock host
-pub async fn lock_one_host_api(
-    _claims: Claims,
-    Path(id): Path<Uuid>,
-    State(pool): State<SqlitePool>,
-) -> impl IntoResponse {
-    let _up = update_text_field(
-        id,
-        "api_key",
-        Uuid::nil().to_string(),
-        pool.acquire().await.unwrap(),
-    )
-    .await;
+    let _up = update_text_field(id, "active", "0".into(), pool.acquire().await.unwrap()).await;
     StatusCode::OK
 }
 
@@ -197,18 +168,22 @@ pub async fn delete_one_host_api(
 }
 
 /// API to create a new host
-pub async fn post_hosts_api(
-    _claims: Claims,
-    State(pool): State<SqlitePool>,
-    Json(payload): Json<Host>,
-) -> impl IntoResponse {
-    debug!("{:?}", payload);
-    let id = payload.id.to_string();
-    let res = payload.insert_into_db(pool.acquire().await.unwrap()).await;
+pub async fn post_hosts_api(_claims: Claims, State(pool): State<SqlitePool>) -> Response {
+    let host = Host {
+        id: Uuid::new_v4(),
+        active: true,
+        created: Utc::now(),
+        ..Default::default()
+    };
+    let res = host
+        .clone()
+        .insert_into_db(pool.acquire().await.unwrap())
+        .await;
+
     if res.rows_affected() == 1 {
-        (StatusCode::CREATED, Json(id))
+        (StatusCode::CREATED, Json(host)).into_response()
     } else {
-        (StatusCode::BAD_REQUEST, Json("".into()))
+        StatusCode::BAD_REQUEST.into_response()
     }
 }
 
@@ -371,22 +346,16 @@ mod tests {
         let pool = create_database("sqlite::memory:").await.unwrap();
         let claims: Claims = Claims::default();
         init_database(&pool, None).await.unwrap();
-        let new_host = Host {
-            id: Uuid::new_v4(),
-            ..Default::default()
-        };
 
-        let api_post = post_hosts_api(
-            claims.clone(),
-            axum::extract::State(pool.clone()),
-            Json(new_host.clone()),
-        )
-        .await
-        .into_response();
-        assert_eq!(api_post.status(), axum::http::StatusCode::CREATED);
+        let post_api = post_hosts_api(claims.clone(), axum::extract::State(pool.clone()))
+            .await
+            .into_response();
+        assert_eq!(post_api.status(), axum::http::StatusCode::CREATED);
+        let bytes = hyper::body::to_bytes(post_api.into_body()).await.unwrap();
+        let new_host: Host = serde_json::from_slice(&bytes).unwrap();
 
         let mut api_update = HashMap::new();
-        api_update.insert("last_pong".to_string(), utc_to_str(Utc::now()));
+        api_update.insert("last_checkin".to_string(), utc_to_str(Utc::now()));
 
         let api_update = update_one_host_api(
             claims.clone(),
@@ -398,23 +367,14 @@ mod tests {
         .into_response();
         assert_eq!(api_update.status(), axum::http::StatusCode::OK);
 
-        let lock_host = lock_one_host_api(
+        let deactivate_host = deactivate_one_host_api(
             claims.clone(),
             axum::extract::Path(new_host.id),
             axum::extract::State(pool.clone()),
         )
         .await
         .into_response();
-        assert_eq!(lock_host.status(), axum::http::StatusCode::OK);
-
-        let approve_host = approve_one_host_api(
-            claims.clone(),
-            axum::extract::Path(new_host.id),
-            axum::extract::State(pool.clone()),
-        )
-        .await
-        .into_response();
-        assert_eq!(approve_host.status(), axum::http::StatusCode::OK);
+        assert_eq!(deactivate_host.status(), axum::http::StatusCode::OK);
 
         let api_get_all = get_hosts_api(claims.clone(), axum::extract::State(pool.clone()))
             .await

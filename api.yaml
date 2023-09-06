@@ -121,27 +121,18 @@ paths:
           description: All hosts deleted successfully
         '403':
           description: Forbidden (delete failed)
+  /hosts/new:
     post:
       tags:
         - hosts
       summary: Create a new host
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Host'
       responses:
         '201':
           description: Host created successfully
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  id:
-                    type: string
-                    format: uuid
+                $ref: '#/components/schemas/Host'
         '400':
           description: Bad request
   /hosts/{id}:
@@ -214,11 +205,11 @@ paths:
           description: Host deleted successfully
         '403':
           description: Forbidden (delete failed)
-  /hosts/{id}/approve:
+  /hosts/{id}/deactivate:
     post:
       tags:
         - hosts
-      summary: Approve host with outdated or unknown apikey
+      summary: Deactivate host
       parameters:
         - in: path
           name: id
@@ -226,28 +217,10 @@ paths:
           schema:
             type: string
             format: uuid
-          description: The ID of the host to approve
+          description: The ID of the host to deactivate
       responses:
         '200':
-          description: Approved host
-        '400':
-          description: Bad request
-  /hosts/{id}/lock:
-    post:
-      tags:
-        - hosts
-      summary: Lock host
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-          description: The ID of the host to lock
-      responses:
-        '200':
-          description: Locked host
+          description: Deactivated host
         '400':
           description: Bad request
   /hosts/{id}/schedules:

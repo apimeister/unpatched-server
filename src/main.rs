@@ -15,7 +15,7 @@ use axum::{
     Error, Router,
 };
 use axum_server::tls_rustls::RustlsConfig;
-use chrono::{prelude::*, Days};
+use chrono::prelude::*;
 use clap::Parser;
 use email_address::EmailAddress;
 use futures::{sink::SinkExt, stream::StreamExt};
@@ -71,9 +71,6 @@ struct Args {
     /// deactivate tls
     #[arg(long)]
     no_tls: bool,
-    /// auto-accept new agents
-    #[arg(long)]
-    auto_accept_agents: bool,
     /// use 7 part instead of 5 part cron pattern
     #[arg(long)]
     seven_part_cron: bool,
@@ -95,7 +92,6 @@ const TLS_KEY: &str = "unpatched.server.key";
 const JWT_SECRET: &str = "jwt.secret";
 
 static CRON: OnceCell<bool> = OnceCell::new();
-static AUTOACC: OnceCell<bool> = OnceCell::new();
 
 #[tokio::main]
 async fn main() {
@@ -120,11 +116,6 @@ async fn main() {
     // cron
     CRON.set(args.seven_part_cron)
         .expect("Error configuring cron format!");
-
-    // skip agent verification
-    AUTOACC
-        .set(args.auto_accept_agents)
-        .expect("Error configuring auto_accept_agents!");
 
     // JWT secret
     let _init_jwt = &KEYS;
@@ -151,10 +142,9 @@ async fn main() {
                 .post(script::post_scripts_api),
         )
         .route(
-            "/api/v1/hosts/:id/approve",
-            post(host::approve_one_host_api),
+            "/api/v1/hosts/:id/deactivate",
+            post(host::deactivate_one_host_api),
         )
-        .route("/api/v1/hosts/:id/lock", post(host::lock_one_host_api))
         .route(
             "/api/v1/hosts/:id/schedules",
             get(schedule::get_host_schedules_api).post(schedule::post_host_schedules_api),
@@ -171,10 +161,9 @@ async fn main() {
         )
         .route(
             "/api/v1/hosts",
-            get(host::get_hosts_api)
-                .delete(host::delete_hosts_api)
-                .post(host::post_hosts_api),
+            get(host::get_hosts_api).delete(host::delete_hosts_api),
         )
+        .route("/api/v1/hosts/new", post(host::post_hosts_api))
         .route(
             "/api/v1/schedules/:id",
             get(schedule::get_one_schedule_api).delete(schedule::delete_one_schedule_api),
@@ -264,35 +253,13 @@ async fn ws_handler(
     headers: HeaderMap,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> impl IntoResponse {
-    let go_on = if *AUTOACC.get().unwrap_or(&false) {
-        Some(Uuid::nil())
-    } else {
-        agent_auth(headers, &addr, pool.clone()).await
-    };
-    if let Some(key) = go_on {
-        // authenticated agent
-        if key.is_nil() {
-            ws.on_upgrade(move |socket| handle_socket(socket, addr, pool))
-        } else {
-            // new agent, send key for future auth
-            ws.on_upgrade(move |socket| handle_first(socket, addr, key))
+    match agent_auth(headers, &addr, pool.clone()).await {
+        Ok(()) => ws.on_upgrade(move |socket| handle_socket(socket, addr, pool)),
+        Err(e) => {
+            error!("{e}");
+            StatusCode::UNAUTHORIZED.into_response()
         }
-    } else {
-        StatusCode::UNAUTHORIZED.into_response()
     }
-}
-
-/// Actual websocket statemachine for api_key exchange (one will be spawned per connection)
-async fn handle_first(socket: WebSocket, who: SocketAddr, key: Uuid) {
-    let _sender_handle = tokio::spawn(async move {
-        // split websocket stream so we can have both directions working independently
-        let (sender, _) = socket.split();
-        let arc_sink = Arc::new(Mutex::new(sender));
-        info!("Connection established to agent: {}", who);
-
-        let _sent_script = send_message(&arc_sink, Message::Text(format!("api_key:{key}"))).await;
-    })
-    .await;
 }
 
 /// Actual websocket statemachine (one will be spawned per connection)
@@ -529,12 +496,12 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                     let host_lock = &*recv_arc_this_host.lock().await;
                     if let Some(host) = host_lock {
                         debug!(
-                            "Update agent {} as alive (hosts table -> last pong)!",
+                            "Update agent {} as alive (hosts table -> last_checkin)!",
                             host.id
                         );
                         host::update_text_field(
                             host.id,
-                            "last_pong",
+                            "last_checkin",
                             utc_to_str(Utc::now()),
                             receiver_pool.acquire().await.unwrap(),
                         )
@@ -558,13 +525,6 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                                 host.id,
                                 "attributes",
                                 serde_json::to_string(&host.attributes).unwrap_or("".to_string()),
-                                receiver_pool.acquire().await.unwrap(),
-                            )
-                            .await;
-                            host::update_text_field(
-                                host.id,
-                                "seed_key",
-                                host.seed_key.to_string(),
                                 receiver_pool.acquire().await.unwrap(),
                             )
                             .await;
@@ -636,132 +596,39 @@ async fn send_message(arc: &SenderSinkArc, m: Message) -> Result<(), Error> {
     x.send(m).await
 }
 
-async fn agent_auth(headers: HeaderMap, who: &SocketAddr, pool: SqlitePool) -> Option<Uuid> {
+async fn agent_auth(headers: HeaderMap, who: &SocketAddr, pool: SqlitePool) -> Result<(), Error> {
     let who = who.to_string();
 
     // make sure header is present and a uuid, otherwise instant reject
-    let Some(api_key) = headers.get("X_API_KEY") else {
-        return None;
-    };
-    let Ok(api_key) = api_key.to_str() else {
-        return None;
-    };
-    let Ok(api_key) = api_key.parse::<Uuid>() else {
-        return None;
-    };
-    debug!("X_API_KEY: {}", api_key);
-
-    // make sure header is present and a uuid, otherwise instant reject
-    let Some(seed_key) = headers.get("X_SEED_KEY") else {
-        return None;
-    };
-    let Ok(seed_key) = seed_key.to_str() else {
-        return None;
-    };
-    let Ok(seed_key) = seed_key.parse::<Uuid>() else {
-        return None;
-    };
-    debug!("X_SEED_KEY: {}", seed_key);
-
-    // make sure header is present and a uuid, otherwise instant reject
-    let Some(agent_id) = headers.get("X_AGENT_ID") else {
-        return None;
-    };
-    let Ok(agent_id) = agent_id.to_str() else {
-        return None;
-    };
-    let Ok(agent_id) = agent_id.parse::<Uuid>() else {
-        return None;
-    };
-    debug!("X_AGENT_ID: {}", agent_id);
-
-    // make sure header is present and a uuid, otherwise instant reject
-    let Some(agent_alias) = headers.get("X_AGENT_ALIAS") else {
-        return None;
-    };
-    let Ok(agent_alias) = agent_alias.to_str() else {
-        return None;
-    };
-    debug!("X_AGENT_ALIAS: {}", agent_alias);
+    let agent_id = headers
+        .get("X_API_KEY")
+        .ok_or(Error::new("Header X_API_KEY not found"))?;
+    let agent_id = agent_id
+        .to_str()
+        .map_err(|_| Error::new("Can't parse X_API_KEY header"))?;
+    let agent_id = agent_id
+        .parse::<Uuid>()
+        .map_err(|_| Error::new("Can't parse X_API_KEY header"))?;
+    debug!("X_API_KEY: {}", agent_id);
 
     // let's see if the host is already present
     let filter = format!("id='{agent_id}'",);
     let host_vec = get_hosts_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
-    let host = match host_vec.first().cloned() {
-        Some(h) => h,
-        None => {
-            // if host is not in DB yet, create placeholder to track approval process
-            info!(
-                "New agent {agent_alias} ({agent_id}) from host {who} trying to connect to Server"
-            );
-            let new_host = Host {
-                id: agent_id,
-                alias: agent_alias.into(),
-                attributes: vec!["placeholder".to_string()],
-                ip: who.clone(),
-                seed_key,
-                api_key: None,
-                api_key_ttl: None,
-                last_pong: None,
-            };
-            let _ins = new_host
-                .clone()
-                .insert_into_db(pool.acquire().await.unwrap())
-                .await;
-            new_host
-        }
+    // unknown ID/API_KEY -> kick
+    let host = host_vec
+        .first()
+        .cloned()
+        .ok_or(Error::new("No agent found with this ID"))?;
+
+    // agent is deactivate, get out
+    if !host.active {
+        warn!(
+            "Agent {} ({}) on host {who} is marked as inactive on Server. Closing connection",
+            host.alias, host.id
+        );
+        return Err(Error::new(""));
     };
-
-    // database says no approval yet, get out
-    let Some(db_key) = host.api_key else {
-        warn!("Api key for agent {agent_alias} ({agent_id}) from host {who} is not approved. Closing connection");
-        return None;
-    };
-
-    // database says no ttl yet, get out
-    let Some(db_ttl) = host.api_key_ttl else {
-        warn!("Api key for agent {agent_alias} ({agent_id}) from host {who} has no ttl. Closing connection");
-        return None;
-    };
-
-    // agent is locked, get out
-    if db_key.is_nil() {
-        warn!("Api key for agent {agent_alias} ({agent_id}) from host {who} is locked. Closing connection");
-        return None;
-    };
-
-    // agent has outdated key, get out
-    if db_ttl < Utc::now() {
-        warn!("Api key for agent {agent_alias} ({agent_id}) from host {who} is outdated. Closing connection");
-        return None;
-    };
-
-    // invalid key
-    if db_key != api_key {
-        debug!("{db_key} - db key");
-        debug!("{api_key} - host key");
-        warn!("Api key for agent {agent_alias} ({agent_id}) from host {who} is invalid. Closing connection");
-        return None;
-    }
-
-    // api_key is known and valid
-    if db_key == api_key && db_ttl > Utc::now() {
-        let ttl_warn = Utc::now().checked_add_days(Days::new(7)).unwrap();
-        if db_ttl < ttl_warn {
-            warn!("Api key for agent {agent_alias} ({agent_id}) from host {who} has less than 7 days to live. Please refresh!");
-        }
-        return Some(Uuid::nil());
-    };
-
-    if seed_key == host.seed_key && api_key.is_nil() && db_ttl > Utc::now() {
-        info!("Connection approved, sending API key to {agent_alias} ({agent_id})");
-        return Some(db_key);
-    }
-
-    // TODO: Implement update/outdated APIKEYS
-    // TODO: Handle agent restart while approving keys
-    warn!("unknown condition, check code!");
-    None
+    Ok(())
 }
 
 async fn generate_execution_timestamp(
@@ -802,6 +669,7 @@ mod tests {
     use crate::db::{create_database, init_database};
 
     use super::*;
+    use chrono::Days;
     use tracing_subscriber::{
         fmt, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
     };

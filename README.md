@@ -43,7 +43,7 @@ Add your key-pair as `unpatched.server.key` and `unpatched.server.crt` to the ce
 ### Self-signed certificate example
 
 1. Make a new folder `./self-signed-certs` and cd into it
-2. Generate an internal rootCA pair and leaf Cert
+2. Generate an internal rootCA pair and leaf Cert - change IP if not using localhost!
 3. copy `rootCA.crt` to agent host and follow instructions in [agent repo](https://github.com/apimeister/monitor-agent)
 
 ```shell
@@ -54,20 +54,22 @@ keyUsage                = digitalSignature,dataEncipherment
 extendedKeyUsage        = clientAuth,serverAuth
 subjectAltName          = @alt_names
 
-[alt_names]
+[alt_names] # if using another IP or DNS, change this!
 DNS.1 = localhost
 IP.2 = 127.0.0.1
 IP.3 = ::1
 ```
 
 ```shell
+# change this to the real IP/DNS
+server_dns="127.0.0.1";
+
 # create root-ca
 openssl req -x509 -newkey rsa:4096 -nodes -out rootCA.crt -keyout rootCA.key -days 365 -subj "/O=internal/CN=$server_dns";
 
 # create key and signing request
 openssl genrsa -out unpatched.server.key 4096;
-openssl req -new -sha256 -key unpatched.server.key -subj "/O=internal/CN=127.0.0.1" -out unpatched.server.csr -addext subjectAltName=DNS:127.0.0.1;
-
+openssl req -new -sha256 -key unpatched.server.key -subj "/O=internal/CN=$server_dns" -out unpatched.server.csr -addext subjectAltName=DNS:$server_dns;
 # check request
 openssl req -in unpatched.server.csr -noout -text;
 

@@ -23,6 +23,14 @@ title = 'Unpatched Server'
     name = "EXECUTIONS"
     url = "/executions"
     weight = 5
+  [[menu.main]]
+    name = "USERS"
+    url = "/users"
+    weight = 6
+  [[menu.main]]
+    name = "API"
+    url = "/api"
+    weight = 7
 
 [markup]
   [markup.goldmark]

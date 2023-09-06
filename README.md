@@ -13,7 +13,6 @@ Options:
   -b, --bind <BIND>                    bind adress for frontend and agent websockets, v6 example [::1] [default: 127.0.0.1]
   -p, --port <PORT>                    bind port for frontend and agent websockets [default: 3000]
       --no-tls                         deactivate tls
-      --auto-accept-agents             auto-accept new agents
       --seven-part-cron                use 7 part instead of 5 part cron pattern
       --cert-folder <FOLDER>           Sets the certificate folder [default: ./self-signed-certs]
       --init-user <INIT_USER>          Email of first user to initialize the server with
@@ -28,8 +27,8 @@ Options:
     - use `--init-user` and `--init-password` to generate an admin user to login with (needs to be done only once)
 2. start server
 3. open webgui at server:port - example `127.0.0.1:3000`
-4. start [agent](https://github.com/apimeister/monitor-agent) to send data to server
-   - you will need to approve the agent via gui or api, unless you have `--auto-accept-agents` set
+4. go to agents tab and create a new [agent](https://github.com/apimeister/monitor-agent)
+   - configure command shown and start agent
 5. refresh to show updated data
 
 ## TLS

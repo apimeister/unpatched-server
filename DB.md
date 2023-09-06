@@ -16,10 +16,13 @@
 
 | Name | Type | Comment
 :--- | :--- | :---
-| id | TEXT | uuid v4 hyphenated
-| alias | TEXT |
-| attributes | TEXT | json |
-| last_pong | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
+| id | TEXT | uuid
+| alias | TEXT | host alias (name)
+| attributes | TEXT | host labels
+| ip | TEXT | host ip:port
+| active | NUMERIC | bool
+| last_checkin | TEXT | last checkin from agent
+| created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 
 ## executions
 

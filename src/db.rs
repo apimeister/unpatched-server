@@ -102,10 +102,9 @@ pub async fn init_database(
 /// | alias | TEXT | host alias (name)
 /// | attributes | TEXT | host labels
 /// | ip | TEXT | host ip:port
-/// | seed_key | TEXT | uuid
-/// | api_key | TEXT | uuid
-/// | api_key_ttl | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
-/// | last_pong | TEXT | last checkin from agent
+/// | active | NUMERIC | bool
+/// | last_checkin | TEXT | last checkin from agent
+/// | created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 async fn create_hosts_table(mut connection: PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
     let _res = query(
         r#"CREATE TABLE IF NOT EXISTS 
@@ -114,10 +113,9 @@ async fn create_hosts_table(mut connection: PoolConnection<Sqlite>) -> Result<()
             alias TEXT,
             attributes TEXT,
             ip TEXT,
-            seed_key TEXT,
-            api_key TEXT,
-            api_key_ttl TEXT,
-            last_pong TEXT
+            active NUMERIC,
+            last_checkin TEXT,
+            created TEXT
         )"#,
     )
     .execute(&mut *connection)

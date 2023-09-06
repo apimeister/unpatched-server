@@ -79,7 +79,7 @@ impl Schedule {
     /// | target_host_id | TEXT | uuid
     /// | timer_cron | TEXT | cron pattern for execution
     /// | timer_ts | TEXT | cron pattern for execution
-    /// | active | bool |
+    /// | active | NUMERIC |
     #[allow(dead_code)]
     // FIXME: write test and remove dead_code
     pub async fn insert_into_db(

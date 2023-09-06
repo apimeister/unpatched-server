@@ -41,9 +41,8 @@ jobs:
       - name: Pack
         working-directory: target
         run: |
-          tar -czvf unpatched-server_x86_64-unknown-linux-musl.tar.gz ../README.md ../LICENSE -C x86_64-unknown-linux-musl/release unpatched-server -C ../../ site
+          tar -czvf unpatched-server_x86_64-unknown-linux-musl.tar.gz ../README.md ../LICENSE -C x86_64-unknown-linux-musl/release unpatched-server
           zip -jv unpatched-server_x86_64-pc-windows-gnu.zip x86_64-pc-windows-gnu/release/unpatched-server.exe ../README.md ../LICENSE
-          zip -rv unpatched-server_x86_64-pc-windows-gnu.zip site
       - uses: actions/upload-artifact@v3
         with:
           name: winlinux
@@ -83,7 +82,6 @@ jobs:
         working-directory: target
         run: |
           zip -jv unpatched-server_x86_64-apple-darwin.zip release/unpatched-server ../README.md ../LICENSE
-          zip -rv unpatched-server_x86_64-apple-darwin.zip site
       - uses: actions/upload-artifact@v3
         with:
           name: mac

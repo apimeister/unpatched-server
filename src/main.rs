@@ -54,6 +54,7 @@ struct ScriptExec {
 }
 
 static WEBPAGE: Dir = include_dir!("$CARGO_MANIFEST_DIR/target/site");
+static API_YAML: &[u8] = include_bytes!("../api.yaml");
 
 type SenderSinkArc = Arc<Mutex<SplitSink<WebSocket, Message>>>;
 

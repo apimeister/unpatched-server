@@ -4,7 +4,7 @@ use axum::{
 };
 use headers::{HeaderMap, HeaderValue};
 
-use crate::jwt::Claims;
+use crate::{jwt::Claims, API_YAML};
 
 /// load swagger gui
 pub async fn api_ui(_claims: Claims) -> impl IntoResponse {
@@ -36,7 +36,6 @@ pub async fn api_ui(_claims: Claims) -> impl IntoResponse {
 
 /// load api.yaml
 pub async fn api_def(_claims: Claims) -> impl IntoResponse {
-    let spec = std::fs::read_to_string("api.yaml").unwrap();
     let mut headers = HeaderMap::new();
     headers.insert(
         header::ACCESS_CONTROL_ALLOW_ORIGIN,
@@ -46,7 +45,7 @@ pub async fn api_def(_claims: Claims) -> impl IntoResponse {
         header::ACCESS_CONTROL_ALLOW_METHODS,
         HeaderValue::from_static("GET"),
     );
-    (StatusCode::OK, headers, spec)
+    (StatusCode::OK, headers, API_YAML)
 }
 
 #[cfg(test)]

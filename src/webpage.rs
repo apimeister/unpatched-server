@@ -11,19 +11,22 @@ pub async fn web_page(uri: Uri) -> impl IntoResponse {
     } else {
         path.to_string()
     };
-    println!("got req: {path}");
+    tracing::trace!("got req: {path}");
     // fix content type
     if path.ends_with(".html") {
         header.insert("Content-Type", HeaderValue::from_static("text/html"));
+    } else if path.ends_with(".css") {
+        header.insert("Content-Type", HeaderValue::from_static("text/css"));
+    } else if path.ends_with(".js") {
+        header.insert("Content-Type", HeaderValue::from_static("text/javascript"));
+    } else if path.ends_with(".svg") {
+        header.insert("Content-Type", HeaderValue::from_static("image/svg+xml"));
     } else {
         header.insert("Content-Type", HeaderValue::from_static("text/plain"));
     }
-    println!("contains {}", crate::WEBPAGE.contains(&path));
-    println!("path {:?}", crate::WEBPAGE.get_entry(&path));
     let maybe_file = crate::WEBPAGE.get_file(&path);
     match maybe_file {
         Some(file) => {
-            println!("found");
             return (StatusCode::OK, header, file.contents_utf8().unwrap());
         }
         None => {
@@ -33,7 +36,6 @@ pub async fn web_page(uri: Uri) -> impl IntoResponse {
             let maybe_file = crate::WEBPAGE.get_file(path);
             match maybe_file {
                 Some(file) => {
-                    println!("found");
                     return (StatusCode::OK, header, file.contents_utf8().unwrap());
                 }
                 None => {

@@ -124,8 +124,14 @@ impl From<SqliteRow> for Host {
 
 /// API to get all hosts
 pub async fn get_hosts_api(_claims: Claims, State(pool): State<SqlitePool>) -> impl IntoResponse {
-    let host_vec = get_hosts_from_db(None, pool.acquire().await.unwrap()).await;
-    Json(host_vec)
+    let stmt = r#"SELECT * FROM hosts ORDER BY active, CAST(last_checkin AS int) DESC, alias ASC, id ASC;"#;
+    let Ok(hosts) = query(stmt)
+        .fetch_all(&mut *pool.acquire().await.unwrap())
+        .await
+    else {
+        return Json(Vec::<Host>::new());
+    };
+    Json(hosts.into_iter().map(|s| s.into()).collect())
 }
 
 /// API to get one host

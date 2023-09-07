@@ -1,8 +1,19 @@
 ---
 title: "agents"
 ---
-<div class="container">
-    <button type="button" class="btn btn-success position-absolute top-50 start-50 translate-middle" data-bs-toggle="modal" data-bs-target="#staticBackdrop" onClick="initAgent()">${plus} new Agent</button>
+<link rel="stylesheet" href="/bootstrap-icons/1.10/bootstrap-icons.css">
+<div class="container mt-1" style="background-color: var(--bs-gray-100);;border-radius:0.5em;padding-left:1em;padding-right:1em;padding-top:0.25em;padding-bottom:0.25em;display:flex;justify-content: space-between;">
+    <div style="display:flex;align-items: center;">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="flexSwitchCheckChecked" checked>
+            <label class="form-check-label" for="flexSwitchCheckChecked">Show Stale Agents</label>
+        </div>
+        <div class="form-check form-switch ms-4">
+            <input class="form-check-input" type="checkbox" role="switch" id="flexSwitchCheckChecked" checked>
+            <label class="form-check-label" for="flexSwitchCheckChecked">Show Inactive Agents</label>
+        </div>
+    </div>
+    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#staticBackdrop" onClick="initAgent()"><i class="bi bi-plus-circle"></i> new Agent</button>
 </div>
 <div class="container mt-4 mb-4" id="all"></div>
 <div class="modal fade" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
@@ -55,10 +66,6 @@ const nodeplus = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
 </svg>`
 const search = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
   <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
-</svg>`
-const plus = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-circle" viewBox="0 0 16 16">
-  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-  <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
 </svg>`
 async function init(){
     let agents = await fetch('/api/v1/hosts').then(r=>r.json());

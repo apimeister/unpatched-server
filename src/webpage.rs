@@ -37,12 +37,11 @@ pub async fn web_page(uri: Uri) -> Response {
     let maybe_file = crate::WEBPAGE.get_file(&path);
     match maybe_file {
         Some(file) => {
-            let result = if is_text_return {
+            if is_text_return {
                 (StatusCode::OK, header, file.contents_utf8().unwrap()).into_response()
             } else {
                 (StatusCode::OK, header, file.contents()).into_response()
-            };
-            return result;
+            }
         }
         None => {
             // try as path

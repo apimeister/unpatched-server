@@ -1,7 +1,7 @@
 ---
 title: "agents"
 ---
-<div class="container mt-4 mb-4" style="display:flex;" id="all"></div>
+<div class="container mt-4 mb-4" id="all"></div>
 <script>
 function parse_time(inp) {
     const i = inp / 1000
@@ -54,19 +54,19 @@ async function init(){
             atts+=/*html*/`<span class="badge rounded-pill text-bg-secondary me-1 ms-1">${attr}</span>`;
         }
         s += /*html*/`
-        <div class="col">
-        <div class="card">
+        <div class="col row-flex">
+        <div class="card w-100">
         <div class="card-header">
-            ${agent.alias || `<span class="opacity-0">placeholder<span>` }
+            ${agent.alias || `Pending invite` }
         </div>
         <div class="card-body">
-            <div class="card-text">${agent.id || `<span class="opacity-0">placeholder<span>`}</div>
+            <div class="card-text">Key: ${agent.id}</div>
             <div class="card-text">Last check-in: ${ agent.last_checkin ? `<abbr title="${time.utcDBDate}">${time.elapsed}</abbr> ago` : `Never` }</div>
-            <div class="card-text">${atts || `<span class="opacity-0">placeholder<span>`}</div>
+            <div class="card-text">${atts || `No labels set`}</div>
         </div>
         <div class="card-body" style="display: flex;justify-content: space-around;">
-            <a class="icon-link icon-link-hover link-secondary" href="#">Run Script ${nodeplus}</a>
-            <a class="icon-link icon-link-hover link-secondary" href="#" data-bs-toggle="modal" data-bs-target="#staticBackdrop2">Show Executions ${search}</a>
+            <a class="icon-link icon-link-hover link-secondary ${agent.last_checkin ? ``:`opacity-0 pe-none`}" href="#">Run Script ${nodeplus}</a>
+            <a class="icon-link icon-link-hover link-secondary ${agent.last_checkin ? ``:`opacity-0 pe-none`}" href="#" data-bs-toggle="modal" data-bs-target="#staticBackdrop2">Show Executions ${search}</a>
         </div>
         </div>
         <div class="modal fade" id="staticBackdrop2" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel2" aria-hidden="true">
@@ -87,9 +87,9 @@ async function init(){
         </div>
         </div></div>`;
     }
-    s += /*html*/`<div class="w-100"></div><div class="col"><div class="card">
+    s += /*html*/`<div class="col row-flex"><div class="card w-100">
         <div class="card-body bg-secondary" style="--bs-bg-opacity: .3;">
-            <br><br><br><div class="card-text"><button type="button" class="btn btn-success position-absolute top-50 start-50 translate-middle" data-bs-toggle="modal" data-bs-target="#staticBackdrop" onClick="initAgent()">${plus} new Agent</button><br><br></div>
+            <br><br><br><br><br><div class="card-text"><button type="button" class="btn btn-success position-absolute top-50 start-50 translate-middle" data-bs-toggle="modal" data-bs-target="#staticBackdrop" onClick="initAgent()">${plus} new Agent</button><br><br></div>
         </div>
         </div></div></div>
         `
@@ -98,13 +98,12 @@ async function init(){
             <div class="modal-content">
             <div class="modal-header">
                 <h1 class="modal-title fs-5" id="staticBackdropLabel">Add a new Agent</h1>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick="location.reload()"></button>
             </div>
             <div class="modal-body"><code id="newAgentScript1"></code>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary">Understood</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onClick="location.reload()">Close</button>
             </div>
             </div>
         </div>
@@ -114,3 +113,9 @@ async function init(){
 }
 init()
 </script>
+<style>
+.row-flex {
+  display: flex;
+  flex-wrap: wrap;
+}
+</style>

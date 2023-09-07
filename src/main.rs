@@ -215,10 +215,13 @@ async fn main() {
 
 async fn http_server(app: Router, addr: SocketAddr) {
     info!("listening on http://{addr}/");
-    axum_server::bind(addr)
+    match axum_server::bind(addr)
         .serve(app.into_make_service_with_connect_info::<SocketAddr>())
         .await
-        .unwrap()
+    {
+        Ok(()) => (),
+        Err(e) => error!("{e}"),
+    }
 }
 
 async fn https_server(app: Router, addr: SocketAddr, tls_folder: PathBuf) {
@@ -236,10 +239,13 @@ async fn https_server(app: Router, addr: SocketAddr, tls_folder: PathBuf) {
         },
     };
     info!("listening on https://{addr}/");
-    axum_server::bind_rustls(addr, config)
+    match axum_server::bind_rustls(addr, config)
         .serve(app.into_make_service_with_connect_info::<SocketAddr>())
         .await
-        .unwrap()
+    {
+        Ok(()) => (),
+        Err(e) => error!("{e}"),
+    }
 }
 
 /// The handler for the HTTP request (this gets called when the HTTP GET lands at the start

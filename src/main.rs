@@ -534,6 +534,13 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, pool: SqlitePool) {
                                 receiver_pool.acquire().await.unwrap(),
                             )
                             .await;
+                            host::update_text_field(
+                                host.id,
+                                "ip",
+                                who.to_string(),
+                                receiver_pool.acquire().await.unwrap(),
+                            )
+                            .await;
                             let filter = format!("id='{}'", host.id);
                             let central_host = host::get_hosts_from_db(
                                 Some(&filter),

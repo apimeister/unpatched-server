@@ -1,7 +1,11 @@
-use axum::{http::HeaderValue, response::IntoResponse};
+use axum::{
+    http::HeaderValue,
+    response::{IntoResponse, Response},
+};
 use hyper::{header::CONTENT_TYPE, HeaderMap, StatusCode, Uri};
 
-pub async fn web_page(uri: Uri) -> impl IntoResponse {
+pub async fn web_page(uri: Uri) -> Response {
+    let mut is_text_return = true;
     let mut header = HeaderMap::new();
     let path = uri.path().strip_prefix('/').unwrap();
     let path = if path.is_empty() {
@@ -21,13 +25,23 @@ pub async fn web_page(uri: Uri) -> impl IntoResponse {
         header.insert(CONTENT_TYPE, HeaderValue::from_static("text/javascript"));
     } else if path.ends_with(".svg") {
         header.insert(CONTENT_TYPE, HeaderValue::from_static("image/svg+xml"));
+    // } else {
+    // header.insert(CONTENT_TYPE, HeaderValue::from_static("text/plain"));
     } else {
-        header.insert(CONTENT_TYPE, HeaderValue::from_static("text/plain"));
+        header.insert(
+            CONTENT_TYPE,
+            HeaderValue::from_static("application/octet-stream"),
+        );
+        is_text_return = false;
     }
     let maybe_file = crate::WEBPAGE.get_file(&path);
     match maybe_file {
         Some(file) => {
-            return (StatusCode::OK, header, file.contents_utf8().unwrap());
+            if is_text_return {
+                (StatusCode::OK, header, file.contents_utf8().unwrap()).into_response()
+            } else {
+                (StatusCode::OK, header, file.contents()).into_response()
+            }
         }
         None => {
             // try as path
@@ -36,7 +50,7 @@ pub async fn web_page(uri: Uri) -> impl IntoResponse {
             let maybe_file = crate::WEBPAGE.get_file(path);
             match maybe_file {
                 Some(file) => {
-                    return (StatusCode::OK, header, file.contents_utf8().unwrap());
+                    return (StatusCode::OK, header, file.contents_utf8().unwrap()).into_response();
                 }
                 None => {
                     return (
@@ -48,6 +62,7 @@ pub async fn web_page(uri: Uri) -> impl IntoResponse {
                             .contents_utf8()
                             .unwrap(),
                     )
+                        .into_response()
                 }
             }
         }

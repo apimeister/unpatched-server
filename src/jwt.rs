@@ -59,18 +59,21 @@ pub async fn api_authorize_user(
     if payload.client_id.is_empty() || payload.client_secret.is_empty() {
         return Err(AuthError::MissingCredentials);
     }
-    let _validate_email =
+    let validate_email =
         EmailAddress::from_str(&payload.client_id).map_err(|_| AuthError::InvalidEmail)?;
+    info!("Starting login for {validate_email}");
     // Here you can check the user credentials from a database
     let filter = format!("email='{}'", payload.client_id);
     let users = get_users_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
     let Some(user) = users.first() else {
+        error!("Login for {validate_email} failed. Wrong credentials");
         return Err(AuthError::WrongCredentials);
     };
     if user
         .verify_password(payload.client_secret.as_bytes())
         .is_err()
     {
+        error!("Login for {validate_email} failed. Wrong credentials");
         return Err(AuthError::WrongCredentials);
     }
     let claims = Claims {
@@ -97,7 +100,7 @@ pub async fn api_authorize_user(
         SET_COOKIE,
         cookie.parse().map_err(|_| AuthError::TokenCreation)?,
     );
-
+    info!("Login for {validate_email} successful");
     Ok(res)
 }
 

@@ -496,7 +496,7 @@ mod tests {
             .fetch_all(&mut *pool.acquire().await.unwrap())
             .await
             .unwrap();
-        assert_eq!(tables.len(), 7);
+        assert_eq!(tables.len(), 8);
 
         // run again to check already-present branch
         init_database(

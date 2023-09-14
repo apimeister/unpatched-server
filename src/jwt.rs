@@ -51,6 +51,18 @@ pub async fn protected(claims: Claims) -> Result<String, AuthError> {
     ))
 }
 
+pub async fn logout(_claims: Claims) -> Response {
+    let mut res = StatusCode::OK.into_response();
+    let cookie = "unpatched_token=''; SameSite=Strict; Secure; Path=/; HttpOnly; Max-Age=0";
+    res.headers_mut()
+        .insert(SET_COOKIE, cookie.parse().unwrap());
+    res
+}
+
+pub async fn login_status(_claims: Claims) -> impl IntoResponse {
+    StatusCode::OK
+}
+
 pub async fn api_authorize_user(
     State(pool): State<SqlitePool>,
     Json(payload): Json<AuthPayload>,
@@ -95,7 +107,9 @@ pub async fn api_authorize_user(
     // Send the authorized token (as payload for apis and cookie header for webpage)
     let body = Json(AuthBody::new(token.clone()));
     let mut res = (StatusCode::OK, body).into_response();
-    let cookie = format!("unpatched_token={token}; SameSite=Strict; Secure; Path=/; HttpOnly; max-age=max-age-in-seconds=31536000");
+    let cookie = format!(
+        "unpatched_token={token}; SameSite=Strict; Secure; Path=/; HttpOnly; Max-Age=31536000"
+    );
     res.headers_mut().insert(
         SET_COOKIE,
         cookie.parse().map_err(|_| AuthError::TokenCreation)?,

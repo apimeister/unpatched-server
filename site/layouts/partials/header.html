@@ -17,6 +17,7 @@
                         class="nav-link" href="{{ .URL }}">{{ .Name }}</a></li>
                 {{ end }}
             </ul>
+            <button class="btn btn-outline-secondary opacity-0 pe-none" type="button" id="loginout" onclick="logOut()">Log out</button>
             <style>
                 .nav-item:last-child {
                     border-right: 0;
@@ -33,3 +34,30 @@
         </div>
     </div>
 </nav>
+<script>
+    async function logOut() {
+            let res = await fetch('/logout');
+            if (!res.ok) {
+                let error = await res.text();
+                throw new Error(error);
+            }
+            sessionStorage.clear()
+            location.reload();
+    }
+
+    async function checkLogIn(){
+        const s = sessionStorage
+        const l = document.getElementById("loginout")
+        if (!s.getItem("logged_in")) {
+            let res = await fetch('/loginstatus');
+            if (res.ok) {
+                s.setItem("logged_in", true)
+                l.classList.remove("opacity-0", "pe-none")
+            }
+        } else {
+            l.classList.remove("opacity-0", "pe-none")
+        }
+    }
+
+    checkLogIn()
+</script>

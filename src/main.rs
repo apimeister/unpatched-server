@@ -196,6 +196,10 @@ async fn main() {
         .route("/api/api.yaml", get(swagger::api_def))
         // .route_layer(AuthLayer::verify())
         .route("/api/v1/authorize", post(jwt::api_authorize_user))
+        .route(
+            "/api/v1/unblock/:id",
+            post(jwt::remove_ip_from_blacklist_api),
+        )
         // Websocket for Agents
         .route("/ws", get(ws_handler))
         .fallback(webpage::web_page)

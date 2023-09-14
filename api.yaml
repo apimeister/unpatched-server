@@ -483,6 +483,24 @@ paths:
           description: Script deleted successfully
         '403':
           description: Forbidden (delete failed)
+  /unblock/{id}:
+    post:
+      tags:
+        - authorization
+      summary: Unblock a blacklisted ip
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the ip to unblock
+      responses:
+        '200':
+          description: IP successfully unblocked
+        '403':
+          description: Forbidden (unblock failed)
   /authorize:
     post:
       tags:

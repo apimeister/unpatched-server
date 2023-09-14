@@ -69,6 +69,17 @@
 | active | NUMERIC |
 | created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 
+## blacklist
+
+| Name | Type | Comment
+:--- | :--- | :---
+| id | TEXT | uuid
+| ip | TEXT |
+| tries | NUMERIC |
+| created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
+| blocked | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
+| blocked_until | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
+
 ## metrics - not implemented yet
 
 | Name | Type | Comment

@@ -483,7 +483,7 @@ paths:
           description: Script deleted successfully
         '403':
           description: Forbidden (delete failed)
-  /authorize:
+  /unblock/{id}:
     post:
       tags:
         - authorization
@@ -501,7 +501,7 @@ paths:
           description: IP successfully unblocked
         '403':
           description: Forbidden (unblock failed)
-  /unblock/{id}:
+  /authorize:
     post:
       tags:
         - authorization

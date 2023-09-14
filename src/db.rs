@@ -71,6 +71,7 @@ pub async fn init_database(
     create_executions_table(pool.acquire().await?).await?;
     create_schedules_table(pool.acquire().await?).await?;
     create_users_table(pool.acquire().await?).await?;
+    create_blacklist_table(pool.acquire().await?).await?;
     let tables = query("PRAGMA table_list;")
         .fetch_all(&mut *pool.acquire().await.unwrap())
         .await?;
@@ -236,6 +237,31 @@ async fn create_users_table(mut connection: PoolConnection<Sqlite>) -> Result<()
             roles TEXT,
             active NUMERIC NOT NULL,
             created TEXT NOT NULL
+        )"#,
+    )
+    .execute(&mut *connection)
+    .await?;
+    Ok(())
+}
+
+/// Create Blacklist Table in SQLite Database
+///
+/// | Name | Type | Comment
+/// :--- | :--- | :---
+/// | id | TEXT | uuid
+/// | ip | TEXT |
+/// | tries | NUMERIC |
+/// | created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
+/// | blocked | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
+async fn create_blacklist_table(mut connection: PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
+    let _res = query(
+        r#"CREATE TABLE IF NOT EXISTS 
+        blacklist(
+            id TEXT NOT NULL,
+            ip TEXT PRIMARY KEY NOT NULL,
+            tries NUMERIC NOT NULL,
+            created TEXT NOT NULL,
+            blocked TEXT NOT NULL
         )"#,
     )
     .execute(&mut *connection)

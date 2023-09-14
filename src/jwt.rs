@@ -1,12 +1,12 @@
 use axum::{
     async_trait,
-    extract::{FromRequestParts, State, TypedHeader},
+    extract::{FromRequestParts, State, TypedHeader, ConnectInfo},
     headers::{authorization::Bearer, Authorization},
     http::{request::Parts, StatusCode},
     response::{IntoResponse, Response},
     Json, RequestPartsExt,
 };
-use chrono::{Days, Utc};
+use chrono::{Days, Utc, DateTime};
 use email_address::EmailAddress;
 use headers::Cookie;
 
@@ -16,15 +16,72 @@ use once_cell::sync::Lazy;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sqlx::SqlitePool;
+use sqlx::{SqlitePool, query, pool::PoolConnection, Sqlite, sqlite::{SqliteRow, SqliteQueryResult}, Row};
 use std::{
     fmt::{Debug, Display},
-    str::FromStr,
+    net::{IpAddr, SocketAddr},
+    str::FromStr, 
 };
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
-use crate::{user::get_users_from_db, JWT_SECRET};
+use crate::{user::get_users_from_db, JWT_SECRET, db::{utc_to_str, utc_from_str}};
+
+const BLACKLIST_AFTER: u8 = 3; 
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+pub struct BlacklistItem {
+    #[serde(default = "Uuid::new_v4")]
+    pub id: Uuid,
+    pub ip: IpAddr,
+    pub tries: u8,
+    #[serde(default = "Utc::now")]
+    pub created: DateTime<Utc>,
+    pub blocked: Option<DateTime<Utc>>,
+}
+
+impl BlacklistItem {
+    /// Insert `BlacklistItem` into users table in SQLite database
+    ///
+    /// | Name | Type | Comment
+    /// :--- | :--- | :---
+    /// | id | TEXT | uuid
+    /// | ip | TEXT | ip address
+    /// | tries | NUMERIC | login tries
+    /// | created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
+    /// | blocked | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ") <-- implemented by another call, always created as NULL
+    pub async fn insert_into_db(
+        self,
+        mut connection: PoolConnection<Sqlite>,
+    ) -> Result<SqliteQueryResult, sqlx::Error> {
+        let q = r#"REPLACE INTO blacklist( id, ip, tries, created ) VALUES ( ?, ?, ?, ? )"#;
+        query(q)
+            .bind(self.id.to_string())
+            .bind(self.ip.to_string())
+            .bind(self.tries)
+            .bind(utc_to_str(self.created))
+            .execute(&mut *connection)
+            .await
+    }
+}
+
+/// Convert `SqliteRow` in `BlacklistItem` struct
+impl From<SqliteRow> for BlacklistItem {
+    fn from(s: SqliteRow) -> Self {
+        let blocked = if s.get::<String, _>("blocked").is_empty() {
+            Some(utc_from_str(&s.get::<String, _>("blocked")))
+        }else {
+            None
+        };
+        BlacklistItem {
+            id: s.get::<String, _>("id").parse().unwrap(),
+            ip: s.get::<String, _>("ip").parse().unwrap(),
+            tries: s.get::<u8, _>("tries"),
+            created: utc_from_str(&s.get::<String, _>("created")),
+            blocked,
+        }
+    }
+}
 
 pub static KEYS: Lazy<Keys> = Lazy::new(|| {
     let sec = std::fs::read(JWT_SECRET).unwrap_or_else(|_| {
@@ -53,8 +110,25 @@ pub async fn protected(claims: Claims) -> Result<String, AuthError> {
 
 pub async fn api_authorize_user(
     State(pool): State<SqlitePool>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(payload): Json<AuthPayload>,
 ) -> Result<Response, AuthError> {
+
+    // blacklist
+    let ip = addr.ip();
+    let filter = format!("ip = '{ip}'");
+    let blacklisted = get_blacklistitems_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
+    let mut bl_item = match blacklisted.first().cloned() {
+        Some(b) => b,
+        None => BlacklistItem{ id: Uuid::new_v4(), ip, tries: 0, created: Utc::now(), blocked: None }
+    };
+
+    // Check if blacklisted and 
+    if bl_item.tries >= BLACKLIST_AFTER {
+        error!("Login for {addr} failed. Blacklisted!");
+        return Err(AuthError::WrongCredentials);
+    }
+
     // Check if the user sent the credentials
     if payload.client_id.is_empty() || payload.client_secret.is_empty() {
         return Err(AuthError::MissingCredentials);
@@ -67,6 +141,11 @@ pub async fn api_authorize_user(
     let users = get_users_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
     let Some(user) = users.first() else {
         error!("Login for {validate_email} failed. Wrong credentials");
+        bl_item.tries += 1;
+        if bl_item.tries >= BLACKLIST_AFTER {
+            bl_item.blocked = Some(Utc::now());
+        }
+        let _ = bl_item.insert_into_db(pool.acquire().await.unwrap()).await;
         return Err(AuthError::WrongCredentials);
     };
     if user
@@ -74,6 +153,11 @@ pub async fn api_authorize_user(
         .is_err()
     {
         error!("Login for {validate_email} failed. Wrong credentials");
+        bl_item.tries += 1;
+        if bl_item.tries >= BLACKLIST_AFTER {
+            bl_item.blocked = Some(Utc::now());
+        }
+        let _ = bl_item.insert_into_db(pool.acquire().await.unwrap()).await;
         return Err(AuthError::WrongCredentials);
     }
     let claims = Claims {
@@ -251,6 +335,42 @@ pub enum AuthError {
     InvalidEmail,
 }
 
+pub async fn get_blacklistitems_from_db(
+    filter: Option<&str>,
+    mut connection: PoolConnection<Sqlite>,
+) -> Vec<BlacklistItem> {
+    let stmt = if let Some(f) = filter {
+        format!("SELECT * FROM blacklist WHERE {f}")
+    } else {
+        "SELECT * FROM blacklist".into()
+    };
+    let blacklist_items = match query(&stmt).fetch_all(&mut *connection).await {
+        Ok(d) => d,
+        Err(_) => return Vec::new(),
+    };
+
+    blacklist_items.into_iter().map(|s| s.into()).collect()
+}
+
+pub async fn delete_blacklistitems_from_db(
+    filter: Option<&str>,
+    mut connection: PoolConnection<Sqlite>,
+) -> StatusCode {
+    let stmt = if let Some(f) = filter {
+        format!("DELETE FROM blacklist WHERE {f}")
+    } else {
+        "DELETE FROM blacklist".into()
+    };
+    let res = query(&stmt).execute(&mut *connection).await;
+    if res.is_err() {
+        StatusCode::FORBIDDEN
+    } else {
+        StatusCode::OK
+    }
+}
+
+
+
 // FIXME: Make this work
 
 // #[derive(Debug, Clone)]
@@ -305,6 +425,8 @@ pub enum AuthError {
 #[cfg(test)]
 mod tests {
 
+    use std::net::Ipv4Addr;
+
     use super::*;
     use crate::{
         db::{create_database, init_database},
@@ -343,10 +465,11 @@ mod tests {
             client_secret: "test123".into(),
         };
         let auth =
-            api_authorize_user(axum::extract::State(pool.clone()), Json(payload.clone())).await;
+            api_authorize_user(axum::extract::State(pool.clone()), axum::extract::ConnectInfo(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080)), Json(payload.clone())).await;
         assert_eq!(auth.unwrap().status(), axum::http::StatusCode::OK);
         let auth = api_authorize_user(
             axum::extract::State(pool.clone()),
+            axum::extract::ConnectInfo(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080)),
             Json(AuthPayload::default()),
         )
         .await;
@@ -357,6 +480,7 @@ mod tests {
         );
         let auth = api_authorize_user(
             axum::extract::State(pool.clone()),
+            axum::extract::ConnectInfo(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080)),
             Json(AuthPayload {
                 client_id: "no@test.int".into(),
                 client_secret: "no".into(),
@@ -370,6 +494,7 @@ mod tests {
         );
         let auth = api_authorize_user(
             axum::extract::State(pool.clone()),
+            axum::extract::ConnectInfo(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080)),
             Json(AuthPayload {
                 client_id: "no-test.int".into(),
                 client_secret: "no".into(),
@@ -387,7 +512,7 @@ mod tests {
         let _init_jwt_present = &KEYS;
 
         let good_auth =
-            api_authorize_user(axum::extract::State(pool.clone()), Json(payload.clone()))
+            api_authorize_user(axum::extract::State(pool.clone()),axum::extract::ConnectInfo(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080)), Json(payload.clone()))
                 .await
                 .unwrap();
         println!("{good_auth:?}");

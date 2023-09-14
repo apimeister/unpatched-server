@@ -123,6 +123,8 @@ async fn main() {
     // build our application with some routes
     let app = Router::new()
         .route("/protected", get(jwt::protected))
+        .route("/logout", get(jwt::logout))
+        .route("/loginstatus", get(jwt::login_status))
         .route(
             "/api/v1/executions/:id",
             get(execution::get_one_execution_api).delete(execution::delete_one_execution_api),

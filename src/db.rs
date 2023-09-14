@@ -253,6 +253,7 @@ async fn create_users_table(mut connection: PoolConnection<Sqlite>) -> Result<()
 /// | tries | NUMERIC |
 /// | created | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 /// | blocked | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
+/// | blocked_until | TEXT | as rfc3339 string ("YYYY-MM-DDTHH:MM:SS.sssZ")
 async fn create_blacklist_table(mut connection: PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
     let _res = query(
         r#"CREATE TABLE IF NOT EXISTS 
@@ -261,7 +262,8 @@ async fn create_blacklist_table(mut connection: PoolConnection<Sqlite>) -> Resul
             ip TEXT PRIMARY KEY NOT NULL,
             tries NUMERIC NOT NULL,
             created TEXT NOT NULL,
-            blocked TEXT NOT NULL
+            blocked TEXT,
+            blocked_until TEXT
         )"#,
     )
     .execute(&mut *connection)

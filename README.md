@@ -31,6 +31,13 @@ Options:
    - configure command shown and start agent
 5. refresh to show updated data
 
+## Authentication
+
+- use init user to create additional users
+- user must be an email address
+- ip will be blacklisted after 5 wrong logins for 5 minutes
+- unblock IPs inside timeframe via `/api/v1/unbock/:id` API
+
 ## TLS
 
 By default this server expects an `unpatched.server.key` and `unpatched.server.crt` file under `./self-signed-certs`. To change this behavior set a new path with the `--cert-folder` option. The file names are not changable.

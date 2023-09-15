@@ -15,7 +15,7 @@ use sqlx::{
 use uuid::Uuid;
 
 use crate::{
-    db::{ utc_from_str, utc_to_str},
+    db::{utc_from_str, utc_to_str},
     jwt::Claims,
 };
 

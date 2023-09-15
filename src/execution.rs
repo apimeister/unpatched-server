@@ -15,7 +15,7 @@ use sqlx::{
 use uuid::Uuid;
 
 use crate::{
-    db::{get_option, utc_from_str, utc_to_str},
+    db::{utc_from_str, utc_to_str},
     jwt::Claims,
 };
 
@@ -62,11 +62,13 @@ impl Execution {
 
 impl From<SqliteRow> for Execution {
     fn from(s: SqliteRow) -> Self {
-        let res = get_option(&s, "response");
         Execution {
             id: s.get::<String, _>("id").parse().unwrap(),
             request: utc_from_str(&s.get::<String, _>("request")),
-            response: res.map(|r| utc_from_str(&r)),
+            response: s
+                .get::<Option<String>, _>("response")
+                .as_deref()
+                .map(utc_from_str),
             host_id: s.get::<String, _>("host_id").parse().unwrap(),
             sched_id: s.get::<String, _>("sched_id").parse().unwrap(),
             created: utc_from_str(&s.get::<String, _>("created")),

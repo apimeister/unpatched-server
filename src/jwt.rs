@@ -577,6 +577,65 @@ mod tests {
             axum::http::StatusCode::NOT_ACCEPTABLE
         );
 
+        // run into block!
+        let _wrong_password = api_authorize_user(
+            axum::extract::State(pool.clone()),
+            axum::extract::ConnectInfo("127.0.0.1:3000".parse().unwrap()),
+            Json(AuthPayload {
+                client_id: "test@test.int".into(),
+                client_secret: "no".into(),
+            }),
+        )
+        .await;
+        for _wrong_credentials in 0..3 {
+            let _ = api_authorize_user(
+                axum::extract::State(pool.clone()),
+                axum::extract::ConnectInfo("127.0.0.1:3000".parse().unwrap()),
+                Json(AuthPayload {
+                    client_id: "no@test.int".into(),
+                    client_secret: "no".into(),
+                }),
+            )
+            .await;
+        }
+        let bl_items = get_blacklistitems_from_db(None, pool.acquire().await.unwrap()).await;
+        assert_eq!(bl_items.len(), 1);
+        let bl_item = bl_items.first().cloned().unwrap();
+        assert_eq!(bl_item.tries, 5);
+        assert!(bl_item.blocked.is_some());
+        assert!(bl_item.blocked_until.is_some());
+
+        // try login while blacklisted
+        let claims: Claims = Claims::default();
+        let blocked_auth = api_authorize_user(
+            axum::extract::State(pool.clone()),
+            axum::extract::ConnectInfo("127.0.0.1:3000".parse().unwrap()),
+            Json(AuthPayload {
+                client_id: "test@test.int".into(),
+                client_secret: "test123".into(),
+            }),
+        )
+        .await;
+        info!("{blocked_auth:#?}");
+        assert_eq!(
+            blocked_auth.as_ref().unwrap_err(),
+            &AuthError::WrongCredentials
+        );
+        assert_eq!(
+            blocked_auth.into_response().status(),
+            axum::http::StatusCode::UNAUTHORIZED
+        );
+
+        //unblock
+        let rem = remove_ip_from_blacklist_api(
+            claims,
+            axum::extract::Path(bl_item.id),
+            axum::extract::State(pool.clone()),
+        )
+        .await
+        .into_response();
+        assert_eq!(rem.status(), axum::http::StatusCode::OK);
+
         // JWT secret
         let _init_jwt_new_file = &KEYS;
         let _init_jwt_present = &KEYS;

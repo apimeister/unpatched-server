@@ -68,3 +68,19 @@ pub async fn web_page(uri: Uri) -> Response {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_web_page() {
+        let web = web_page(Uri::from_static("/agents")).await;
+        assert_eq!(web.status(), axum::http::StatusCode::OK);
+        let web = web_page(Uri::from_static("/")).await;
+        assert_eq!(web.status(), axum::http::StatusCode::OK);
+        let web = web_page(Uri::from_static("/agents2")).await;
+        assert_eq!(web.status(), axum::http::StatusCode::OK);
+    }
+}

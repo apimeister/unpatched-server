@@ -74,7 +74,8 @@ async function init(){
         <div class="col row-flex">
         <div class="card w-100">
         <div class="card-header">
-            ${agent.alias || `Pending invite` }
+            <div>${agent.alias || `Pending invite` }</div>
+            <div><button class="btn btn-sm" style="color:var(--bs-danger);"><i class="bi bi-trash"></i><button></div>
         </div>
         <div class="card-body">
             <div class="card-text">Key: ${agent.id}</div>

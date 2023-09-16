@@ -1,4 +1,4 @@
 ---
 title: "index"
 ---
-<script>window.location.href = "/agents"</script>
+<script>window.location.href = "/hosts"</script>

@@ -8,8 +8,8 @@ title = 'Unpatched Server'
     url = "/"
     weight = 1
   [[menu.main]]
-    name = "AGENTS"
-    url = "/agents"
+    name = "HOSTS"
+    url = "/hosts"
     weight = 2
   [[menu.main]]
     name = "SCRIPTS"

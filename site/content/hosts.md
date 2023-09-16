@@ -1,19 +1,22 @@
 ---
-title: "agents"
+title: "hosts"
 ---
 <link rel="stylesheet" href="/bootstrap-icons/1.10/bootstrap-icons.css">
 <div class="container mt-1" style="padding-left:1em;padding-right:1em;padding-top:0.25em;padding-bottom:0.25em;display:flex;justify-content: space-between;">
     <div style="display:flex;align-items: center;">
         <div class="form-check form-switch">
             <input class="form-check-input" type="checkbox" role="switch" id="flexSwitchCheckChecked" checked>
-            <label class="form-check-label" for="flexSwitchCheckChecked">Show Stale Agents</label>
+            <label class="form-check-label" for="flexSwitchCheckChecked">Show Stale Hosts</label>
         </div>
         <div class="form-check form-switch ms-4">
             <input class="form-check-input" type="checkbox" role="switch" id="flexSwitchCheckChecked" checked>
-            <label class="form-check-label" for="flexSwitchCheckChecked">Show Inactive Agents</label>
+            <label class="form-check-label" for="flexSwitchCheckChecked">Show Inactive Hosts</label>
         </div>
     </div>
+    <div>
+    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#staticDownload"><i class="bi bi-download"></i> download Agent</button>
     <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#staticBackdrop" onClick="initAgent()"><i class="bi bi-plus-circle"></i> new Agent</button>
+    </div>
 </div>
 <div class="container mt-4 mb-4" id="all"></div>
 <div class="modal fade" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
@@ -28,6 +31,30 @@ title: "agents"
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onClick="location.reload()">Close</button>
         </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="staticDownload" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticDownloadLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="staticDownloadLabel">Download Agent Software</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2">
+                    <a href="#"><i class="bi bi-windows me-2"></i>unpatched-agent.exe</a>
+                </div>
+                <div class="mb-2">
+                    <a href="#"><i class="bi bi-apple me-2"></i>unpatched-agent</a>
+                </div>
+                <div class="mb-2">
+                    <a href="#"><i class="bi bi-filetype-sh me-2"></i>unpatched-agent</a>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
         </div>
     </div>
 </div>

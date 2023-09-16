@@ -71,12 +71,12 @@ async function init(){
             atts+=/*html*/`<span class="badge rounded-pill text-bg-secondary me-1 ms-1">${attr}</span>`;
         }
         s += /*html*/`
-        <div class="col row-flex">
+        <div class="col row-flex" id="${agent.id}">
         <div class="card w-100">
         <div class="card-header" style="display: flex;justify-content: space-between;">
             <div>${agent.alias || `Pending invite` }</div>
             <div>
-                <button class="btn btn-sm" style="color:var(--bs-danger);"><i class="bi bi-trash"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteHost(event)"><i class="bi bi-trash"></i></button>
             </div>
         </div>
         <div class="card-body">
@@ -108,6 +108,12 @@ async function init(){
         </div></div>`;
     }
     document.querySelector("#all").innerHTML=s;
+}
+async function deleteHost(evt){
+    if(evt) evt.preventDefault();
+    let hostId = evt.target.parentNode.parentNode.parentNode.parentNode.id;
+    await fetch(`/api/v1/hosts/${hostId}`, {method: "DELETE"});
+    location.reload();
 }
 init()
 </script>

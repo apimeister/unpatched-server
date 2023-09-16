@@ -103,6 +103,7 @@ async function init(){
         <div class="card-header" style="display: flex;justify-content: space-between;">
             <div>${agent.alias || `Pending invite` }</div>
             <div>
+                <button class="btn btn-sm btn-outline-warn" onclick="deactivateHost(event)"><i class="bi bi-activity"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteHost(event)"><i class="bi bi-trash"></i></button>
             </div>
         </div>
@@ -140,6 +141,12 @@ async function deleteHost(evt){
     if(evt) evt.preventDefault();
     let hostId = evt.target.parentNode.parentNode.parentNode.parentNode.id;
     await fetch(`/api/v1/hosts/${hostId}`, {method: "DELETE"});
+    location.reload();
+}
+async function deactivateHost(evt){
+    if(evt) evt.preventDefault();
+    let hostId = evt.target.parentNode.parentNode.parentNode.parentNode.id;
+    await fetch(`/api/v1/hosts/${hostId}/deactivate`, {method: "POST"});
     location.reload();
 }
 init()

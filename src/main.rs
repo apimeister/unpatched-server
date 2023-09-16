@@ -4,7 +4,6 @@ use crate::{
     host::{Host, ScheduleState},
     schedule::Timer,
 };
-
 use axum::{
     extract::connect_info::ConnectInfo,
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
@@ -24,12 +23,11 @@ use headers::HeaderMap;
 use host::get_hosts_from_db;
 use include_dir::{include_dir, Dir};
 use jwt::KEYS;
-// use jwt::AuthLayer;
 use once_cell::sync::OnceCell;
 use schedule::Schedule;
 use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolConnection, sqlite::SqlitePool, Sqlite};
-use std::{io::ErrorKind, path::PathBuf, time::Duration};
+use std::{fs::File, io::ErrorKind, path::PathBuf, time::Duration};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
@@ -213,9 +211,18 @@ async fn main() {
 
     // spawn http or https depending on --no-tls
     if args.no_tls {
-        let _http = tokio::spawn(http_server(app, addr)).await;
+        http_server(app, addr).await;
     } else {
-        let _https = tokio::spawn(https_server(app, addr, args.cert_folder)).await;
+        //TODO check for exiting cert
+        let cert_file = File::open(TLS_CERT);
+        let key_file = File::open(TLS_KEY);
+        if cert_file.is_ok() && key_file.is_ok() {
+            // use exiting files
+            https_server(app, addr, args.cert_folder).await;
+        } else {
+            info!("no existing TLS certificate found ({TLS_CERT},{TLS_KEY}), generating self signed certificate...");
+            https_server_self_signed(app, addr).await;
+        }
     }
 }
 
@@ -244,6 +251,27 @@ async fn https_server(app: Router, addr: SocketAddr, tls_folder: PathBuf) {
             _ => panic!("{e}"),
         },
     };
+    info!("listening on https://{addr}/");
+    match axum_server::bind_rustls(addr, config)
+        .serve(app.into_make_service_with_connect_info::<SocketAddr>())
+        .await
+    {
+        Ok(()) => (),
+        Err(e) => error!("{e}"),
+    }
+}
+
+async fn https_server_self_signed(app: Router, addr: SocketAddr) {
+    use rcgen::generate_simple_self_signed;
+    let subject_alt_names = vec!["hello.world.example".to_string(), "localhost".to_string()];
+
+    let cert = generate_simple_self_signed(subject_alt_names).unwrap();
+    let config = RustlsConfig::from_pem(
+        cert.serialize_pem().unwrap().as_bytes().to_vec(),
+        cert.serialize_private_key_pem().as_bytes().to_vec(),
+    )
+    .await
+    .unwrap();
     info!("listening on https://{addr}/");
     match axum_server::bind_rustls(addr, config)
         .serve(app.into_make_service_with_connect_info::<SocketAddr>())

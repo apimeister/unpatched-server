@@ -76,7 +76,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_web_page() {
-        let web = web_page(Uri::from_static("/agents")).await;
+        let web = web_page(Uri::from_static("/hosts")).await;
         assert_eq!(web.status(), axum::http::StatusCode::OK);
         let web = web_page(Uri::from_static("/")).await;
         assert_eq!(web.status(), axum::http::StatusCode::OK);

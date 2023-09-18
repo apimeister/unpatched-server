@@ -1,7 +1,7 @@
 ---
 title: "login"
 ---
-<div class="col-12 col-md-6" style="align-self: center;margin-top: auto;margin-bottom: auto;border: 1px solid var(--bs-gray-200);border-radius:1em;padding:1em;">
+<div class="col-12 col-md-6 col-lg-6 col-xl-4" style="align-self: center;margin-top: auto;margin-bottom: auto;border: 1px solid var(--bs-gray-200);border-radius:1em;padding:1em;">
   <h1 class="mb-4" style="text-align:center;font-weight: 600;background-color: var(--bs-gray-200);border-top-left-radius: 1rem;border-top-right-radius: 1rem;">Login</h1>
   <form>
     <div class="form-outline mb-4">
@@ -35,6 +35,6 @@ async function login(form){
         let error = await res.text();
         throw new Error(error);
     }
-    window.location.href = "/agents";
+    window.location.href = "/hosts";
 }
 </script>

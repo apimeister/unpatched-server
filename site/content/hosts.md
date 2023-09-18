@@ -1,7 +1,6 @@
 ---
 title: "hosts"
 ---
-<link rel="stylesheet" href="/bootstrap-icons/1.10/bootstrap-icons.css">
 <div class="container mt-1" style="padding-left:1em;padding-right:1em;padding-top:0.25em;padding-bottom:0.25em;display:flex;justify-content: space-between;">
     <div style="display:flex;align-items: center;">
         <div class="form-check form-switch">

@@ -214,8 +214,8 @@ async fn main() {
         http_server(app, addr).await;
     } else {
         //TODO check for exiting cert
-        let cert_file = File::open(TLS_CERT);
-        let key_file = File::open(TLS_KEY);
+        let cert_file = File::open(args.cert_folder.join(TLS_CERT));
+        let key_file = File::open(args.cert_folder.join(TLS_KEY));
         if cert_file.is_ok() && key_file.is_ok() {
             // use exiting files
             https_server(app, addr, args.cert_folder).await;

@@ -146,6 +146,10 @@ async fn main() {
             post(host::deactivate_one_host_api),
         )
         .route(
+            "/api/v1/hosts/:id/activate",
+            post(host::activate_one_host_api),
+        )
+        .route(
             "/api/v1/hosts/:id/schedules",
             get(schedule::get_host_schedules_api).post(schedule::post_host_schedules_api),
         )

@@ -223,6 +223,24 @@ paths:
           description: Deactivated host
         '400':
           description: Bad request
+  /hosts/{id}/activate:
+    post:
+      tags:
+        - hosts
+      summary: Activate host
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the host to activate
+      responses:
+        '200':
+          description: Activated host
+        '400':
+          description: Bad request
   /hosts/{id}/schedules:
     get:
       tags:

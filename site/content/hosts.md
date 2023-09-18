@@ -181,6 +181,12 @@ async function deactivateHost(evt){
     await fetch(`/api/v1/hosts/${hostId}/deactivate`, {method: "POST"});
     location.reload();
 }
+async function activateHost(evt){
+    if(evt) evt.preventDefault();
+    let hostId = evt.target.closest(".col").id;
+    await fetch(`/api/v1/hosts/${hostId}/activate`, {method: "POST"});
+    location.reload();
+}
 init()
 </script>
 <style>

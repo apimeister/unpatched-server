@@ -124,7 +124,7 @@ impl From<SqliteRow> for Host {
 
 /// API to get all hosts
 pub async fn get_hosts_api(_claims: Claims, State(pool): State<SqlitePool>) -> impl IntoResponse {
-    let stmt = r#"SELECT * FROM hosts ORDER BY active, CAST(last_checkin AS int) DESC, alias ASC, id ASC;"#;
+    let stmt = r#"SELECT * FROM hosts ORDER BY active DESC, CAST(last_checkin AS int) DESC, alias ASC, id ASC;"#;
     let Ok(hosts) = query(stmt)
         .fetch_all(&mut *pool.acquire().await.unwrap())
         .await
@@ -152,6 +152,16 @@ pub async fn deactivate_one_host_api(
     State(pool): State<SqlitePool>,
 ) -> impl IntoResponse {
     let _up = update_text_field(id, "active", "0".into(), pool.acquire().await.unwrap()).await;
+    StatusCode::OK
+}
+
+/// API to deactive host
+pub async fn activate_one_host_api(
+    _claims: Claims,
+    Path(id): Path<Uuid>,
+    State(pool): State<SqlitePool>,
+) -> impl IntoResponse {
+    let _up = update_text_field(id, "active", "1".into(), pool.acquire().await.unwrap()).await;
     StatusCode::OK
 }
 

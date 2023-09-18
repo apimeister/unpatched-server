@@ -14,7 +14,7 @@ use axum::{
     Error, Router,
 };
 use axum_server::tls_rustls::RustlsConfig;
-use chrono::prelude::*;
+use chrono::{prelude::*, Days};
 use clap::Parser;
 use email_address::EmailAddress;
 use futures::{sink::SinkExt, stream::StreamExt};
@@ -88,6 +88,7 @@ const SQLITE_DB: &str = "sqlite:unpatched_server_internal.sqlite";
 const TLS_CERT: &str = "unpatched.server.crt";
 const TLS_KEY: &str = "unpatched.server.key";
 const JWT_SECRET: &str = "jwt.secret";
+const API_KEY_LOGIN_TTL: u64 = 30;
 
 static CRON: OnceCell<bool> = OnceCell::new();
 
@@ -671,7 +672,7 @@ async fn agent_auth(headers: HeaderMap, who: &SocketAddr, pool: SqlitePool) -> R
         .cloned()
         .ok_or(Error::new("No agent found with this ID"))?;
 
-    // agent is deactivate, get out
+    // agent is deactivated, get out
     if !host.active {
         warn!(
             "Agent {} ({}) on host {who} is marked as inactive on Server. Closing connection",
@@ -679,6 +680,18 @@ async fn agent_auth(headers: HeaderMap, who: &SocketAddr, pool: SqlitePool) -> R
         );
         return Err(Error::new(""));
     };
+
+    if let Some(check_in) = host.last_checkin {
+        if check_in < Utc::now().checked_sub_days(Days::new(API_KEY_LOGIN_TTL)).unwrap() {
+            warn!(
+                "Agent {} ({}) on host {who} tries to use outdated API_KEY, older than {API_KEY_LOGIN_TTL} days. Closing connection",
+                host.alias, host.id
+            );
+            return Err(Error::new(""));
+        }
+    };
+
+
     Ok(())
 }
 

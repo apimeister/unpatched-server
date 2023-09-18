@@ -171,13 +171,13 @@ async function init(){
 }
 async function deleteHost(evt){
     if(evt) evt.preventDefault();
-    let hostId = evt.target.parentNode.parentNode.parentNode.parentNode.id;
-    await fetch(`/api/v1/hosts/${hostId}`, {method: "DELETE"});
+    let hostId = evt.target.closest(".col").id;
+    let res = await fetch(`/api/v1/hosts/${hostId}`, {method: "DELETE"});
     location.reload();
 }
 async function deactivateHost(evt){
     if(evt) evt.preventDefault();
-    let hostId = evt.target.parentNode.parentNode.parentNode.parentNode.id;
+    let hostId = evt.target.closest(".col").id;
     await fetch(`/api/v1/hosts/${hostId}/deactivate`, {method: "POST"});
     location.reload();
 }

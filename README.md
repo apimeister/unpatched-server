@@ -38,6 +38,17 @@ Options:
 - ip will be blacklisted after 5 wrong logins for 5 minutes
 - unblock IPs inside timeframe via `/api/v1/unbock/:id` API
 
+## hardcoded defaults
+
+| Name | Value | Explaination
+:--- | :--- | :---
+| UPDATE_RATE | 5 seconds | Rate with which the server will run any process (send new scripts, update timings etc.)
+| SQLITE_DB | unpatched_server_internal.sqlite | SQLite Databasefile name
+| TLS_CERT | unpatched.server.crt | TLS Certificate certificate part
+| TLS_KEY | unpatched.server.key | TLS Certificate key part
+| JWT_SECRET | jwt.secret | File name for persisting JWT secret on disc
+| API_KEY_LOGIN_TTL | 30 days | Time to go by from last checkin until an API_KEY is no longer seen as valid
+
 ## TLS
 
 By default this server expects an `unpatched.server.key` and `unpatched.server.crt` file under `./self-signed-certs`. To change this behavior set a new path with the `--cert-folder` option. The file names are not changable.

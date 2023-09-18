@@ -1,7 +1,7 @@
 ---
 title: "schedules"
 ---
-<div class="container mt-4 mb-8" id="all"></div>
+<div class="container my-5" id="all"></div>
 <style>
 .header{
     font-weight: 600;

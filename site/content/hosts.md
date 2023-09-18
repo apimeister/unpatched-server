@@ -1,7 +1,7 @@
 ---
 title: "hosts"
 ---
-<div class="container mt-1" style="padding-left:1em;padding-right:1em;padding-top:0.25em;padding-bottom:0.25em;display:flex;justify-content: space-between;">
+<div class="container mt-1 d-flex p-3 justify-content-between flex-wrap">
     <div style="display:flex;align-items: center;">
         <div class="form-check form-switch">
             <input class="form-check-input" type="checkbox" role="switch" id="staleHosts1" checked onClick="filterTypes('stale')" disabled>
@@ -21,7 +21,7 @@ title: "hosts"
     <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#staticBackdrop" onClick="initAgent()"><i class="bi bi-plus-circle"></i> new Agent</button>
     </div>
 </div>
-<div class="container mt-4 mb-4" id="all"></div>
+<div class="container my-2" id="all"></div>
 <div class="modal fade" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">

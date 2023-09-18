@@ -19,13 +19,32 @@ title: "hosts"
 </div>
 <div class="container mt-4 mb-4" id="all"></div>
 <div class="modal fade" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
         <div class="modal-header">
             <h1 class="modal-title fs-5" id="staticBackdropLabel">Add a new Agent</h1>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick="location.reload()"></button>
         </div>
-        <div class="modal-body"><code id="newAgentScript1"></code>
+        <div class="modal-body">
+            <div class="form-outline mb-2">
+                <input type="text" id="hostAddr1" class="form-control" name="hostAddr1" required/>
+                <label class="form-label" for="hostAddr1">Host address 
+                <a href="#" data-bs-toggle="tooltip" title="Can be URL like localhost:3000 or IP like 127.0.0.1:3000 or IPv6 like [::1]:3000">
+                <i class="bi bi-info-circle"></i>
+                </a>
+            </label>
+            </div>
+            <div class="form-outline mb-2">
+                <input type="text" id="hostAlias1" class="form-control" name="hostAlias1" required placeholder="linux,prod"/>
+                <label class="form-label" for="hostAlias1">Host alias</label>
+            </div>
+            <div class="form-outline mb-4">
+                <input type="text" id="hostAttr1" class="form-control" name="hostAttr1" required placeholder="new-agent-123"/>
+                <label class="form-label" for="hostAttr1">Attributes (comma seperated)</label>
+            </div>
+            <div class="bg-secondary p-2" style="--bs-bg-opacity: .3;">
+            <code id="newAgentScript1"></code>
+            </div>
         </div>
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onClick="location.reload()">Close</button>
@@ -83,7 +102,23 @@ async function initAgent(){
     }
     res = await res.json();
     console.log(res);
-    document.getElementById("newAgentScript1").innerText = `SSL_CERT_FILE=rootCA.crt unpatched-agent --alias new-agent-123 --attributes linux,prod --id ${res.id} --server ${window.location.host}`;
+    let hostAddr = window.location.host;
+    let hostAttr = document.getElementById("hostAttr1").placeholder;
+    let hostAlias = document.getElementById("hostAlias1").placeholder;
+    document.getElementById("hostAddr1").placeholder = `${hostAddr}`;
+    document.getElementById("hostAddr1").addEventListener("keyup", () => {
+        hostAddr = document.getElementById("hostAddr1").value;
+        document.getElementById("newAgentScript1").innerText = `unpatched-agent --alias ${hostAlias} --attributes ${hostAttr} --id ${res.id} --server ${hostAddr}`;
+     });
+    document.getElementById("hostAttr1").addEventListener("keyup", () => {
+        hostAttr = document.getElementById("hostAttr1").value;
+        document.getElementById("newAgentScript1").innerText = `unpatched-agent --alias ${hostAlias} --attributes ${hostAttr} --id ${res.id} --server ${hostAddr}`;
+     });
+     document.getElementById("hostAlias1").addEventListener("keyup", () => {
+        hostAlias = document.getElementById("hostAlias1").value;
+        document.getElementById("newAgentScript1").innerText = `unpatched-agent --alias ${hostAlias} --attributes ${hostAttr} --id ${res.id} --server ${hostAddr}`;
+     });
+    document.getElementById("newAgentScript1").innerText = `unpatched-agent --alias ${hostAlias} --attributes ${hostAttr} --id ${res.id} --server ${hostAddr}`;
 }
 async function init(){
     let agents = await fetch('/api/v1/hosts').then(r=>r.json());

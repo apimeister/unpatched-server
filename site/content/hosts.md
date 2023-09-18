@@ -85,14 +85,14 @@ function parse_time(inp) {
     let seconds = Math.floor((i % 3600) % 60);
     seconds = seconds < 10 ? '0' + seconds : seconds;
     const readable_time = /*html*/`${hours}:${minutes}:${seconds}`;
-    return readable_time;
+    return { hours, minutes, seconds, readable_time };
 }
 function online(last_checkin){
     const utcDBDate = new Date(last_checkin);
     const now = new Date(Date.now());
     const elapsed_int = now - utcDBDate;
-    const elapsed = parse_time(elapsed_int);
-    return { utcDBDate, elapsed };
+    const parsed_time = parse_time(elapsed_int);
+    return { utcDBDate, parsed_time };
 }
 async function initAgent(){
     let res = await fetch(`/api/v1/hosts/new`, {method: "POST"});
@@ -133,15 +133,15 @@ async function init(){
         <div class="col row-flex" id="${agent.id}">
         <div class="card w-100">
         <div class="card-header" style="display: flex;justify-content: space-between;">
-            <div>${agent.alias || `Pending invite` }</div>
+            <div>${agent.alias || `Pending invite` }${!agent.active ? `<span class="fst-italic"> (deactivated)</span>`:``}</div>
             <div>
-                <button class="btn btn-sm btn-outline-warn" onclick="deactivateHost(event)"><i class="bi bi-activity"></i></button>
+                <button class="btn btn-sm ${agent.active && agent.last_checkin ? (time.parsed_time.hours > 1 ? `btn-warning`:`btn-success`):`btn-secondary`} ${!agent.last_checkin ? `opacity-0 pe-none`: ``}" onclick="${agent.active ? `deactivateHost(event)`:`activateHost(event)`}"><i class="bi bi-activity"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteHost(event)"><i class="bi bi-trash"></i></button>
             </div>
         </div>
         <div class="card-body">
             <div class="card-text">Key: ${agent.id}</div>
-            <div class="card-text">Last check-in: ${ agent.last_checkin ? `<abbr title="${time.utcDBDate}">${time.elapsed}</abbr> ago` : `Never` }</div>
+            <div class="card-text">Last check-in: ${ agent.last_checkin ? `<abbr title="${time.utcDBDate}">${time.parsed_time.readable_time}</abbr> ago` : `Never` }</div>
             <div class="card-text">${atts || `No labels set`}</div>
         </div>
         <div class="card-body" style="display: flex;justify-content: space-around;">
@@ -172,7 +172,7 @@ async function init(){
 async function deleteHost(evt){
     if(evt) evt.preventDefault();
     let hostId = evt.target.closest(".col").id;
-    let res = await fetch(`/api/v1/hosts/${hostId}`, {method: "DELETE"});
+    await fetch(`/api/v1/hosts/${hostId}`, {method: "DELETE"});
     location.reload();
 }
 async function deactivateHost(evt){

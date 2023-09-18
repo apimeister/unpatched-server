@@ -1,7 +1,13 @@
 ---
 title: "scripts"
 ---
-<div class="container" id="all"></div>
+<div class="container mt-1 d-flex p-3 justify-content-end flex-wrap">
+    <div><!--left side buttons here--></div>
+    <div>
+        <a class="btn btn-outline-primary" href="/api/v1/scripts" download="scripts.json"><i class="bi bi-download"></i> Export Scripts</a>
+    </div>
+</div>
+<div class="container my-2" id="all"></div>
 <script>
 async function init(){
     let scripts = await fetch('/api/v1/scripts').then(r=>r.json());

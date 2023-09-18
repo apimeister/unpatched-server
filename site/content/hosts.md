@@ -65,13 +65,13 @@ title: "hosts"
             </div>
             <div class="modal-body">
                 <div class="mb-2">
-                    <a href="#"><i class="bi bi-windows me-2"></i>unpatched-agent.exe</a>
+                    <a href="https://github.com/apimeister/unpatched-server/releases/latest/download/unpatched-server_x86_64-pc-windows-gnu.zip"><i class="bi bi-windows me-2"></i>unpatched-agent.exe</a>
                 </div>
                 <div class="mb-2">
-                    <a href="#"><i class="bi bi-apple me-2"></i>unpatched-agent</a>
+                    <a href="https://github.com/apimeister/unpatched-server/releases/latest/download/unpatched-server_x86_64-apple-darwin.zip" ><i class="bi bi-apple me-2"></i>unpatched-agent</a>
                 </div>
                 <div class="mb-2">
-                    <a href="#"><i class="bi bi-filetype-sh me-2"></i>unpatched-agent</a>
+                    <a href="https://github.com/apimeister/unpatched-server/releases/latest/download/unpatched-server_x86_64-unknown-linux-musl.tar.gz"><i class="bi bi-filetype-sh me-2"></i>unpatched-agent</a>
                 </div>
             </div>
             <div class="modal-footer">

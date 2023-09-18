@@ -102,23 +102,21 @@ async function initAgent(){
     }
     res = await res.json();
     console.log(res);
-    let hostAddr = window.location.host;
-    let hostAttr = document.getElementById("hostAttr1").placeholder;
-    let hostAlias = document.getElementById("hostAlias1").placeholder;
-    document.getElementById("hostAddr1").placeholder = `${hostAddr}`;
-    document.getElementById("hostAddr1").addEventListener("keyup", () => {
-        hostAddr = document.getElementById("hostAddr1").value;
-        document.getElementById("newAgentScript1").innerText = `unpatched-agent --alias ${hostAlias} --attributes ${hostAttr} --id ${res.id} --server ${hostAddr}`;
+    let dat = document.getElementById("hostAttr1");
+    let dad = document.getElementById("hostAddr1");
+    let dal = document.getElementById("hostAlias1");
+    let nas = document.getElementById("newAgentScript1");
+    dad.placeholder = `${window.location.host}`;
+    dad.addEventListener("keyup", () => {
+        nas.innerText = `unpatched-agent --alias ${dal.value || dal.placeholder} --attributes ${dat.value || dat.placeholder} --id ${res.id} --server ${dad.value || dad.placeholder}`;
      });
-    document.getElementById("hostAttr1").addEventListener("keyup", () => {
-        hostAttr = document.getElementById("hostAttr1").value;
-        document.getElementById("newAgentScript1").innerText = `unpatched-agent --alias ${hostAlias} --attributes ${hostAttr} --id ${res.id} --server ${hostAddr}`;
+    dat.addEventListener("keyup", () => {
+        nas.innerText = `unpatched-agent --alias ${dal.value || dal.placeholder} --attributes ${dat.value || dat.placeholder} --id ${res.id} --server ${dad.value || dad.placeholder}`;
      });
-     document.getElementById("hostAlias1").addEventListener("keyup", () => {
-        hostAlias = document.getElementById("hostAlias1").value;
-        document.getElementById("newAgentScript1").innerText = `unpatched-agent --alias ${hostAlias} --attributes ${hostAttr} --id ${res.id} --server ${hostAddr}`;
+     dal.addEventListener("keyup", () => {
+        nas.innerText = `unpatched-agent --alias ${dal.value || dal.placeholder} --attributes ${dat.value || dat.placeholder} --id ${res.id} --server ${dad.value || dad.placeholder}`;
      });
-    document.getElementById("newAgentScript1").innerText = `unpatched-agent --alias ${hostAlias} --attributes ${hostAttr} --id ${res.id} --server ${hostAddr}`;
+    nas.innerText = `unpatched-agent --alias ${dal.placeholder} --attributes ${dat.placeholder} --id ${res.id} --server ${window.location.host}`;
 }
 async function init(){
     let agents = await fetch('/api/v1/hosts').then(r=>r.json());

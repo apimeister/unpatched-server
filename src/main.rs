@@ -682,7 +682,11 @@ async fn agent_auth(headers: HeaderMap, who: &SocketAddr, pool: SqlitePool) -> R
     };
 
     if let Some(check_in) = host.last_checkin {
-        if check_in < Utc::now().checked_sub_days(Days::new(API_KEY_LOGIN_TTL)).unwrap() {
+        if check_in
+            < Utc::now()
+                .checked_sub_days(Days::new(API_KEY_LOGIN_TTL))
+                .unwrap()
+        {
             warn!(
                 "Agent {} ({}) on host {who} tries to use outdated API_KEY, older than {API_KEY_LOGIN_TTL} days. Closing connection",
                 host.alias, host.id
@@ -690,7 +694,6 @@ async fn agent_auth(headers: HeaderMap, who: &SocketAddr, pool: SqlitePool) -> R
             return Err(Error::new(""));
         }
     };
-
 
     Ok(())
 }

@@ -4,12 +4,16 @@ title: "hosts"
 <div class="container mt-1" style="padding-left:1em;padding-right:1em;padding-top:0.25em;padding-bottom:0.25em;display:flex;justify-content: space-between;">
     <div style="display:flex;align-items: center;">
         <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" role="switch" id="staleHosts1" checked>
+            <input class="form-check-input" type="checkbox" role="switch" id="staleHosts1" checked onClick="filterTypes('stale')" disabled>
             <label class="form-check-label" for="staleHosts1">Show Stale Hosts</label>
         </div>
         <div class="form-check form-switch ms-4">
-            <input class="form-check-input" type="checkbox" role="switch" id="inactiveHosts1" checked>
+            <input class="form-check-input" type="checkbox" role="switch" id="inactiveHosts1" checked onClick="filterTypes('inactive')" disabled>
             <label class="form-check-label" for="inactiveHosts1">Show Inactive Hosts</label>
+        </div>
+        <div class="form-check form-switch ms-4">
+            <input class="form-check-input" type="checkbox" role="switch" id="inviteHosts1" checked onClick="filterTypes('invite')" disabled>
+            <label class="form-check-label" for="inviteHosts1">Show Pending Invites</label>
         </div>
     </div>
     <div>
@@ -77,6 +81,10 @@ title: "hosts"
     </div>
 </div>
 <script>
+function filterTypes(type) {
+    let d = document.getElementsByClassName(`hostCard ${type}`);
+    for (e of d) { e.classList.toggle("d-none");}
+}
 function parse_time(inp) {
     const i = inp / 1000
     const hours = Math.floor(i / 3600);
@@ -118,24 +126,35 @@ async function initAgent(){
      });
     nas.innerText = `unpatched-agent --alias ${dal.placeholder} --attributes ${dat.placeholder} --id ${res.id} --server ${window.location.host}`;
 }
+function typing(agent){
+    if (!agent.active) {return "inactive"};
+    if (!agent.last_checkin) { return "invite"};
+    let agent_time = online(agent.last_checkin);
+    if (agent_time.parsed_time.hours > 1) {return "stale"};
+    return "active"
+}
 async function init(){
     let agents = await fetch('/api/v1/hosts').then(r=>r.json());
     if (agents.error == "Invalid token") { window.location.href = "/login" }
     console.log(agents);
     let s = /*html*/`<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-4">`;
     for(agent of agents){
+        const type = typing(agent);
         const time = online(agent.last_checkin);
+        if (type == "stale") { document.getElementById("staleHosts1").removeAttribute("disabled"); }
+        if (type == "inactive") { document.getElementById("inactiveHosts1").removeAttribute("disabled"); }
+        if (type == "invite") { document.getElementById("inviteHosts1").removeAttribute("disabled"); }
         let atts="";
         for(attr of agent.attributes){
             atts+=/*html*/`<span class="badge rounded-pill text-bg-secondary me-1 ms-1">${attr}</span>`;
         }
         s += /*html*/`
-        <div class="col row-flex" id="${agent.id}">
+        <div class="col row-flex hostCard ${type}" id="${agent.id}" >
         <div class="card w-100">
         <div class="card-header" style="display: flex;justify-content: space-between;">
-            <div>${agent.alias || `Pending invite` }${!agent.active ? `<span class="fst-italic"> (deactivated)</span>`:``}</div>
+            <div>${agent.alias || `Pending invite` }${type == "inactive" ? `<span class="fst-italic"> (deactivated)</span>`:``}</div>
             <div>
-                <button class="btn btn-sm ${agent.active && agent.last_checkin ? (time.parsed_time.hours > 1 ? `btn-warning`:`btn-success`):`btn-secondary`} ${!agent.last_checkin ? `opacity-0 pe-none`: ``}" onclick="${agent.active ? `deactivateHost(event)`:`activateHost(event)`}"><i class="bi bi-activity"></i></button>
+                <button class="btn btn-sm ${ type == "stale" ? `btn-warning`: type == "success" ? `btn-success`: `btn-secondary`} ${type == "invite" ? `opacity-0 pe-none`: ``}" onclick="${agent.active ? `deactivateHost(event)`:`activateHost(event)`}"><i class="bi bi-activity"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteHost(event)"><i class="bi bi-trash"></i></button>
             </div>
         </div>
@@ -145,8 +164,8 @@ async function init(){
             <div class="card-text">${atts || `No labels set`}</div>
         </div>
         <div class="card-body" style="display: flex;justify-content: space-around;">
-            <a class="icon-link icon-link-hover link-secondary ${agent.last_checkin ? ``:`opacity-0 pe-none`}" href="#">Run Script <i class="bi bi-clipboard2-plus"></i></a>
-            <a class="icon-link icon-link-hover link-secondary ${agent.last_checkin ? ``:`opacity-0 pe-none`}" href="#" data-bs-toggle="modal" data-bs-target="#staticBackdrop2">Show Executions <i class="bi bi-search"></i></a>
+            <a class="icon-link icon-link-hover link-secondary ${type == "invite" ? `opacity-0 pe-none`:``}" href="#">Run Script <i class="bi bi-clipboard2-plus"></i></a>
+            <a class="icon-link icon-link-hover link-secondary ${type == "invite" ? `opacity-0 pe-none`:``}" href="#" data-bs-toggle="modal" data-bs-target="#staticBackdrop2">Show Executions <i class="bi bi-search"></i></a>
         </div>
         </div>
         <div class="modal fade" id="staticBackdrop2" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel2" aria-hidden="true">

@@ -4,12 +4,12 @@ title: "hosts"
 <div class="container mt-1" style="padding-left:1em;padding-right:1em;padding-top:0.25em;padding-bottom:0.25em;display:flex;justify-content: space-between;">
     <div style="display:flex;align-items: center;">
         <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" role="switch" id="flexSwitchCheckChecked" checked>
-            <label class="form-check-label" for="flexSwitchCheckChecked">Show Stale Hosts</label>
+            <input class="form-check-input" type="checkbox" role="switch" id="staleHosts1" checked>
+            <label class="form-check-label" for="staleHosts1">Show Stale Hosts</label>
         </div>
         <div class="form-check form-switch ms-4">
-            <input class="form-check-input" type="checkbox" role="switch" id="flexSwitchCheckChecked" checked>
-            <label class="form-check-label" for="flexSwitchCheckChecked">Show Inactive Hosts</label>
+            <input class="form-check-input" type="checkbox" role="switch" id="inactiveHosts1" checked>
+            <label class="form-check-label" for="inactiveHosts1">Show Inactive Hosts</label>
         </div>
     </div>
     <div>

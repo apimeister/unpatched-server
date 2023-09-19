@@ -81,7 +81,7 @@ title: "hosts"
     </div>
 </div>
 <div class="modal fade" id="staticRun" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticDownloadLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-dialog modal-dialog-centered modal-xl  modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <h1 class="modal-title fs-5" id="staticRunLabel">Available Scripts</h1>
@@ -89,26 +89,73 @@ title: "hosts"
             </div>
             <div class="modal-body" id="staticRunBody">
                 <div class="row">
-                    <div class="col-md-6 col-12">
+                    <div class="col-md-4 col-12">
                         <ul class="list-group" id="staticRunUl"></ul>
                     </div>
-                    <div class="col-md-6 col-12">
+                    <div class="col-md-8 col-12">
                         <h5>Create a new script to run now</h5>
                         <form id="scriptFormModal" class="needs-validation" novalidate>
-                        <label for="scriptNameModal" class="form-label">Script Name</label>
-                            <input id="scriptNameModal" name="name" type="text" class="form-control" placeholder="My New Script" required>
-                            <div class="invalid-feedback">
-                                Please choose a name for your script
+                <div class="row mb-3">
+                    <!-- info side left -->
+                    <div class="col-md-6 col-12">
+                        <div class="row mb-3">
+                            <div class="col">
+                                <label for="scriptNameModal" class="form-label">Script Name</label>
+                                <input id="scriptNameModal" name="name" type="text" class="form-control" placeholder="My New Script" required>
+                                <div class="invalid-feedback">
+                                    Please choose a name for your script
+                                </div>
                             </div>
-                            <label for="scriptRegexModal" class="form-label">Output Regex</label>
-                            <textarea id="scriptRegexModal" name="output_regex" class="form-control" rows="2" placeholder=".*"></textarea>
-                            <label for="scriptContentModal" class="form-label">Script Content</label>
-                            <textarea id="scriptContentModal" name="script_content" class="form-control" rows="6" placeholder="uptime -p" required></textarea>
-                        </form>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col">
+                                <label for="scriptVersionModal" class="form-label">Script Version</label>
+                                <input id="scriptVersionModal" name="version" type="text" class="form-control" placeholder="0.1.0">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col">
+                                <label for="scriptLabelsModal" class="form-label">Labels (comma seperated)</label>
+                                <input id="scriptLabelsModal" name="labels" type="text" class="form-control" placeholder="linux,prod">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col">
+                                <label for="scriptTimeoutModal" class="form-label">Timeout in seconds</label>
+                                <input id="scriptTimeoutModal" name="timeout" type="text" class="form-control" placeholder="5" oninput="timeModal(this.value)">
+                                <p id="scriptTimeoutHintModal">Info (readable): 0h:00m:05s</p>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col">
+                            </div>
+                        </div>
+                    </div>
+                    <!-- script side right -->
+                    <div class="col-md-6 col-12">
+                        <div class="row mb-3">
+                            <div class="col">
+                                <label for="scriptRegexModal" class="form-label">Output Regex</label>
+                                <textarea id="scriptRegexModal" name="output_regex" class="form-control" rows="3" placeholder=".*"></textarea>
+                            </div>
+                        </div>
+                            <div class="row mb-3">
+                            <div class="col">
+                                <label for="scriptContentModal" class="form-label">Script Content</label>
+                                <textarea id="scriptContentModal" name="script_content" class="form-control" rows="8" placeholder="uptime -p" required></textarea>
+                                <div class="invalid-feedback">
+                                    Please enter something to execute
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onClick="newScript(event)">Create and Run</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -224,16 +271,72 @@ async function init(){
 }
 async function runModal(evt){
     if(evt) evt.preventDefault();
+    document.getElementById("staticRun").firstElementChild.id = evt.target.closest(".col").id;
     let scripts = await fetch('/api/v1/scripts').then(r=>r.json());
     console.log(scripts);
     let s = /*html*/``;
     for (script of scripts) {
         s += /*html*/`
-            <li class="list-group-item d-flex justify-content-between"><span>${script.name}</span> <span>v${script.version}</span> <button type="button" class="btn btn-primary">Run</button></li>
+            <li class="list-group-item d-flex justify-content-between"><span>${script.name}</span> <span>v${script.version}</span> <button type="button" class="btn btn-primary" id="${script.id}" onClick="runNow(event)">Run</button></li>
         `
     }
     s += /*html*/``;
     document.getElementById("staticRunUl").innerHTML=s;
+}
+async function newScript(evt){
+    let modalForm = document.getElementById("scriptFormModal");
+    if (!modalForm.checkValidity()) {
+        modalForm.classList.add('was-validated')
+        return
+      }
+    let formData = new FormData(modalForm);
+    let formDataObject = Object.fromEntries(formData.entries());
+    formDataObject.labels = (formDataObject.labels || document.getElementById("scriptLabelsModal").placeholder).split(',');
+    formDataObject.version = formDataObject.version || document.getElementById("scriptVersionModal").placeholder;
+    formDataObject.timeout = { secs: parseInt(formDataObject.timeout || document.getElementById("scriptTimeoutModal").placeholder), nanos: 0 };
+    formDataObject.output_regex = formDataObject.output_regex || document.getElementById("scriptRegexModal").placeholder;
+    let formDataJsonString = JSON.stringify(formDataObject);
+    let fetchOptions = {
+        method: "POST",
+        headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        },
+        body: formDataJsonString,
+    };
+    let scriptId = await fetch('/api/v1/scripts', fetchOptions).then(r=>r.json());
+    await createSchedule(scriptId);
+    location.reload();
+}
+async function runNow(evt){
+    await createSchedule(evt.target.id);
+    location.reload();
+}
+async function createSchedule(scriptId){
+    let hostId = document.getElementById("staticRun").firstElementChild.id;
+    const schedule = {
+        script_id: scriptId,
+        target: {host_id: hostId},
+        timer: {timestamp: new Date().toJSON()},
+        active: true
+    };
+    let scheduleJsonString = JSON.stringify(schedule);
+    console.log(scheduleJsonString);
+    let fetchOptions = {
+        method: "POST",
+        headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        },
+        body: scheduleJsonString,
+    };
+    let res = await fetch('/api/v1/schedules', fetchOptions);
+    if (!res.ok) {
+        let error = await res.text();
+        throw new Error(error);
+    }
+    console.log(res);
+    // location.reload();
 }
 async function deleteHost(evt){
     if(evt) evt.preventDefault();

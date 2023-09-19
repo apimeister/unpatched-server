@@ -80,7 +80,23 @@ title: "hosts"
         </div>
     </div>
 </div>
-<div class="modal fade" id="staticRun" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticDownloadLabel" aria-hidden="true">
+<div class="modal fade" id="staticExec" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticExecLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="staticExecLabel">Executions</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="staticExecBody">
+                Implement this
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="staticRun" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticRunLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
@@ -96,7 +112,7 @@ title: "hosts"
         </div>
     </div>
 </div>
-<div class="modal fade" id="staticRunNewScript" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticDownloadLabel" aria-hidden="true">
+<div class="modal fade" id="staticRunNewScript" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticRunNewScriptLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl  modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
@@ -242,42 +258,26 @@ async function init(){
             atts+=/*html*/`<span class="badge rounded-pill text-bg-secondary me-1 ms-1">${attr}</span>`;
         }
         s += /*html*/`
-        <div class="col row-flex hostCard ${type}" id="${agent.id}" >
-        <div class="card w-100">
-        <div class="card-header" style="display: flex;justify-content: space-between;">
-            <div>${agent.alias || `Pending invite` }${type == "inactive" ? `<span class="fst-italic"> (deactivated)</span>`:``}</div>
-            <div>
-                <button class="btn btn-sm ${ type == "stale" ? `btn-warning`: type == "success" ? `btn-success`: `btn-secondary`} ${type == "invite" ? `opacity-0 pe-none`: ``}" onclick="${agent.active ? `deactivateHost(event)`:`activateHost(event)`}"><i class="bi bi-activity"></i></button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteHost(event)"><i class="bi bi-trash"></i></button>
+        <div class="col row-flex hostCard ${type}" id="${agent.id}">
+            <div class="card w-100">
+                <div class="card-header" style="display: flex;justify-content: space-between;">
+                    <div>${agent.alias || `Pending invite` }${type == "inactive" ? `<span class="fst-italic"> (deactivated)</span>`:``}</div>
+                    <div>
+                        <button class="btn btn-sm ${ type == "stale" ? `btn-warning`: type == "success" ? `btn-success`: `btn-secondary`} ${type == "invite" ? `opacity-0 pe-none`: ``}" onclick="${agent.active ? `deactivateHost(event)`:`activateHost(event)`}"><i class="bi bi-activity"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteHost(event)"><i class="bi bi-trash"></i></button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="card-text">Key: ${agent.id}</div>
+                    <div class="card-text">Last check-in: ${ agent.last_checkin ? `<abbr title="${time.utcDBDate}">${time.parsed_time.readable_time}</abbr> ago` : `Never` }</div>
+                    <div class="card-text">${atts || `No labels set`}</div>
+                </div>
+                <div class="card-body" style="display: flex;justify-content: space-around;">
+                    <a class="icon-link icon-link-hover link-secondary ${type == "invite" ? `opacity-0 pe-none`:``}" href="#" onClick="runModal(event)" data-bs-toggle="modal" data-bs-target="#staticRun">Run Script <i class="bi bi-play-circle"></i></a>
+                    <a class="icon-link icon-link-hover link-secondary ${type == "invite" ? `opacity-0 pe-none`:``}" href="#" onClick="execModal(event)" data-bs-toggle="modal" data-bs-target="#staticExec">Show Executions <i class="bi bi-search"></i></a>
+                </div>
             </div>
-        </div>
-        <div class="card-body">
-            <div class="card-text">Key: ${agent.id}</div>
-            <div class="card-text">Last check-in: ${ agent.last_checkin ? `<abbr title="${time.utcDBDate}">${time.parsed_time.readable_time}</abbr> ago` : `Never` }</div>
-            <div class="card-text">${atts || `No labels set`}</div>
-        </div>
-        <div class="card-body" style="display: flex;justify-content: space-around;">
-            <a class="icon-link icon-link-hover link-secondary ${type == "invite" ? `opacity-0 pe-none`:``}" href="#" onClick="runModal(event)" data-bs-toggle="modal" data-bs-target="#staticRun">Run Script <i class="bi bi-play-circle"></i></a>
-            <a class="icon-link icon-link-hover link-secondary ${type == "invite" ? `opacity-0 pe-none`:``}" href="#" data-bs-toggle="modal" data-bs-target="#staticBackdrop2">Show Executions <i class="bi bi-search"></i></a>
-        </div>
-        </div>
-        <div class="modal fade" id="staticBackdrop2" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel2" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-            <div class="modal-header">
-                <h1 class="modal-title fs-5" id="staticBackdropLabel2">Executions for Agent ${agent.alias}</h1>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                Implement this
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary">Understood</button>
-            </div>
-            </div>
-        </div>
-        </div></div>`;
+        </div>`;
     }
     document.querySelector("#all").innerHTML=s;
 }
@@ -294,6 +294,20 @@ async function runModal(evt){
     }
     s += /*html*/``;
     document.getElementById("staticRunUl").innerHTML=s;
+}
+async function execModal(evt){
+    if(evt) evt.preventDefault();
+    let hostId = evt.target.closest(".col").id;
+    let executions = await fetch(`/api/v1/hosts/${hostId}/executions`).then(r=>r.json());
+    console.log(executions);
+    let s = /*html*/`<ul>`;
+    for (execution of executions) {
+        s += /*html*/`
+            <li class="list-group-item d-flex justify-content-between">${JSON.stringify(execution)}</li>
+        `
+    }
+    s += /*html*/`</ul>`;
+    document.getElementById("staticExecBody").innerHTML=s;
 }
 async function newScript(evt){
     let modalForm = document.getElementById("scriptFormModal");

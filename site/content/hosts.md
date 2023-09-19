@@ -81,76 +81,88 @@ title: "hosts"
     </div>
 </div>
 <div class="modal fade" id="staticRun" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticDownloadLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-xl  modal-dialog-scrollable">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <h1 class="modal-title fs-5" id="staticRunLabel">Available Scripts</h1>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="staticRunBody">
+                <ul class="list-group" id="staticRunUl"></ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="staticRunNewScript" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticDownloadLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl  modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="staticRunNewScriptLabel">Create a new Script and run it</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="staticRunNewScriptBody">
                 <div class="row">
-                    <div class="col-md-4 col-12">
-                        <ul class="list-group" id="staticRunUl"></ul>
-                    </div>
-                    <div class="col-md-8 col-12">
-                        <h5>Create a new script to run now</h5>
+                    <div class="col-md-6 col-12">
                         <form id="scriptFormModal" class="needs-validation" novalidate>
-                <div class="row mb-3">
-                    <!-- info side left -->
-                    <div class="col-md-6 col-12">
-                        <div class="row mb-3">
-                            <div class="col">
-                                <label for="scriptNameModal" class="form-label">Script Name</label>
-                                <input id="scriptNameModal" name="name" type="text" class="form-control" placeholder="My New Script" required>
-                                <div class="invalid-feedback">
-                                    Please choose a name for your script
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col">
-                                <label for="scriptVersionModal" class="form-label">Script Version</label>
-                                <input id="scriptVersionModal" name="version" type="text" class="form-control" placeholder="0.1.0">
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col">
-                                <label for="scriptLabelsModal" class="form-label">Labels (comma seperated)</label>
-                                <input id="scriptLabelsModal" name="labels" type="text" class="form-control" placeholder="linux,prod">
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col">
-                                <label for="scriptTimeoutModal" class="form-label">Timeout in seconds</label>
-                                <input id="scriptTimeoutModal" name="timeout" type="text" class="form-control" placeholder="5" oninput="timeModal(this.value)">
-                                <p id="scriptTimeoutHintModal">Info (readable): 0h:00m:05s</p>
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col">
-                            </div>
-                        </div>
-                    </div>
-                    <!-- script side right -->
-                    <div class="col-md-6 col-12">
-                        <div class="row mb-3">
-                            <div class="col">
-                                <label for="scriptRegexModal" class="form-label">Output Regex</label>
-                                <textarea id="scriptRegexModal" name="output_regex" class="form-control" rows="3" placeholder=".*"></textarea>
-                            </div>
-                        </div>
                             <div class="row mb-3">
-                            <div class="col">
-                                <label for="scriptContentModal" class="form-label">Script Content</label>
-                                <textarea id="scriptContentModal" name="script_content" class="form-control" rows="8" placeholder="uptime -p" required></textarea>
-                                <div class="invalid-feedback">
-                                    Please enter something to execute
+                                <!-- info side left -->
+                                <div class="col-md-6 col-12">
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                            <label for="scriptNameModal" class="form-label">Script Name</label>
+                                            <input id="scriptNameModal" name="name" type="text" class="form-control" placeholder="My New Script" required>
+                                            <div class="invalid-feedback">
+                                                Please choose a name for your script
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                            <label for="scriptVersionModal" class="form-label">Script Version</label>
+                                            <input id="scriptVersionModal" name="version" type="text" class="form-control" placeholder="0.1.0">
+                                        </div>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                            <label for="scriptLabelsModal" class="form-label">Labels (comma seperated)</label>
+                                            <input id="scriptLabelsModal" name="labels" type="text" class="form-control" placeholder="linux,prod">
+                                        </div>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                            <label for="scriptTimeoutModal" class="form-label">Timeout in seconds</label>
+                                            <input id="scriptTimeoutModal" name="timeout" type="text" class="form-control" placeholder="5" oninput="timeModal(this.value)">
+                                            <p id="scriptTimeoutHintModal">Info (readable): 0h:00m:05s</p>
+                                        </div>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- script side right -->
+                                <div class="col-md-6 col-12">
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                            <label for="scriptRegexModal" class="form-label">Output Regex</label>
+                                            <textarea id="scriptRegexModal" name="output_regex" class="form-control" rows="3" placeholder=".*"></textarea>
+                                        </div>
+                                    </div>
+                                        <div class="row mb-3">
+                                        <div class="col">
+                                            <label for="scriptContentModal" class="form-label">Script Content</label>
+                                            <textarea id="scriptContentModal" name="script_content" class="form-control" rows="8" placeholder="uptime -p" required></textarea>
+                                            <div class="invalid-feedback">
+                                                Please enter something to execute
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </form>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -245,7 +257,7 @@ async function init(){
             <div class="card-text">${atts || `No labels set`}</div>
         </div>
         <div class="card-body" style="display: flex;justify-content: space-around;">
-            <a class="icon-link icon-link-hover link-secondary ${type == "invite" ? `opacity-0 pe-none`:``}" href="#" onClick="runModal(event)" data-bs-toggle="modal" data-bs-target="#staticRun">Run Script <i class="bi bi-clipboard2-plus"></i></a>
+            <a class="icon-link icon-link-hover link-secondary ${type == "invite" ? `opacity-0 pe-none`:``}" href="#" onClick="runModal(event)" data-bs-toggle="modal" data-bs-target="#staticRun">Run Script <i class="bi bi-play-circle"></i></a>
             <a class="icon-link icon-link-hover link-secondary ${type == "invite" ? `opacity-0 pe-none`:``}" href="#" data-bs-toggle="modal" data-bs-target="#staticBackdrop2">Show Executions <i class="bi bi-search"></i></a>
         </div>
         </div>
@@ -274,7 +286,7 @@ async function runModal(evt){
     document.getElementById("staticRun").firstElementChild.id = evt.target.closest(".col").id;
     let scripts = await fetch('/api/v1/scripts').then(r=>r.json());
     console.log(scripts);
-    let s = /*html*/``;
+    let s = /*html*/`<li class="list-group-item d-flex justify-content-between"><span>Create a new Script and run it</span> <button type="button" class="btn btn-success px-3" data-bs-toggle="modal" data-bs-target="#staticRunNewScript"><i class="bi bi-plus-circle"></i></button></li>`;
     for (script of scripts) {
         s += /*html*/`
             <li class="list-group-item d-flex justify-content-between"><span>${script.name}</span> <span>v${script.version}</span> <button type="button" class="btn btn-primary" id="${script.id}" onClick="runNow(event)">Run</button></li>
@@ -321,7 +333,6 @@ async function createSchedule(scriptId){
         active: true
     };
     let scheduleJsonString = JSON.stringify(schedule);
-    console.log(scheduleJsonString);
     let fetchOptions = {
         method: "POST",
         headers: {
@@ -335,8 +346,6 @@ async function createSchedule(scriptId){
         let error = await res.text();
         throw new Error(error);
     }
-    console.log(res);
-    // location.reload();
 }
 async function deleteHost(evt){
     if(evt) evt.preventDefault();

@@ -80,6 +80,40 @@ title: "hosts"
         </div>
     </div>
 </div>
+<div class="modal fade" id="staticRun" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticDownloadLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="staticRunLabel">Available Scripts</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="staticRunBody">
+                <div class="row">
+                    <div class="col-md-6 col-12">
+                        <ul class="list-group" id="staticRunUl"></ul>
+                    </div>
+                    <div class="col-md-6 col-12">
+                        <h5>Create a new script to run now</h5>
+                        <form id="scriptFormModal" class="needs-validation" novalidate>
+                        <label for="scriptNameModal" class="form-label">Script Name</label>
+                            <input id="scriptNameModal" name="name" type="text" class="form-control" placeholder="My New Script" required>
+                            <div class="invalid-feedback">
+                                Please choose a name for your script
+                            </div>
+                            <label for="scriptRegexModal" class="form-label">Output Regex</label>
+                            <textarea id="scriptRegexModal" name="output_regex" class="form-control" rows="2" placeholder=".*"></textarea>
+                            <label for="scriptContentModal" class="form-label">Script Content</label>
+                            <textarea id="scriptContentModal" name="script_content" class="form-control" rows="6" placeholder="uptime -p" required></textarea>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 <script>
 function filterTypes(type) {
     let d = document.getElementsByClassName(`hostCard ${type}`);
@@ -164,7 +198,7 @@ async function init(){
             <div class="card-text">${atts || `No labels set`}</div>
         </div>
         <div class="card-body" style="display: flex;justify-content: space-around;">
-            <a class="icon-link icon-link-hover link-secondary ${type == "invite" ? `opacity-0 pe-none`:``}" href="#">Run Script <i class="bi bi-clipboard2-plus"></i></a>
+            <a class="icon-link icon-link-hover link-secondary ${type == "invite" ? `opacity-0 pe-none`:``}" href="#" onClick="runModal(event)" data-bs-toggle="modal" data-bs-target="#staticRun">Run Script <i class="bi bi-clipboard2-plus"></i></a>
             <a class="icon-link icon-link-hover link-secondary ${type == "invite" ? `opacity-0 pe-none`:``}" href="#" data-bs-toggle="modal" data-bs-target="#staticBackdrop2">Show Executions <i class="bi bi-search"></i></a>
         </div>
         </div>
@@ -187,6 +221,19 @@ async function init(){
         </div></div>`;
     }
     document.querySelector("#all").innerHTML=s;
+}
+async function runModal(evt){
+    if(evt) evt.preventDefault();
+    let scripts = await fetch('/api/v1/scripts').then(r=>r.json());
+    console.log(scripts);
+    let s = /*html*/``;
+    for (script of scripts) {
+        s += /*html*/`
+            <li class="list-group-item d-flex justify-content-between"><span>${script.name}</span> <span>v${script.version}</span> <button type="button" class="btn btn-primary">Run</button></li>
+        `
+    }
+    s += /*html*/``;
+    document.getElementById("staticRunUl").innerHTML=s;
 }
 async function deleteHost(evt){
     if(evt) evt.preventDefault();

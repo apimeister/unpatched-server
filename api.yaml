@@ -322,12 +322,6 @@ paths:
             type: string
             format: uuid
           description: The ID of the host to get executions for
-        - in: query
-          name: filter
-          description: filter
-          schema:
-            type: string
-            enum: [active, inactive, all]
       responses:
         '200':
           description: Successful response containing a list of executions
@@ -336,7 +330,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Schedule'
+                  $ref: '#/components/schemas/Execution'
   /schedules:
     get:
       tags:
@@ -421,6 +415,29 @@ paths:
           description: Schedule deleted successfully
         '403':
           description: Forbidden (delete failed)
+  /schedules/{id}/executions:
+    get:
+      tags:
+        - schedules
+        - executions
+      summary: Get all executions for this schedule
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the schedule to get executions for
+      responses:
+        '200':
+          description: Successful response containing a list of executions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Execution'
   /scripts:
     get:
       tags:

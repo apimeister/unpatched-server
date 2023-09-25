@@ -97,6 +97,17 @@ pub async fn get_host_executions_api(
     Json(execution_vec)
 }
 
+/// API to get all executions for host
+pub async fn get_schedule_executions_api(
+    _claims: Claims,
+    Path(id): Path<Uuid>,
+    State(pool): State<SqlitePool>,
+) -> impl IntoResponse {
+    let filter = format!("sched_id='{id}'",);
+    let execution_vec = get_executions_from_db(Some(&filter), pool.acquire().await.unwrap()).await;
+    Json(execution_vec)
+}
+
 /// API to get one execution
 pub async fn get_one_execution_api(
     _claims: Claims,

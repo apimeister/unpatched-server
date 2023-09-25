@@ -170,6 +170,10 @@ async fn main() {
         )
         .route("/api/v1/hosts/new", post(host::post_hosts_api))
         .route(
+            "/api/v1/schedules/:id/executions",
+            get(execution::get_schedule_executions_api),
+        )
+        .route(
             "/api/v1/schedules/:id",
             get(schedule::get_one_schedule_api).delete(schedule::delete_one_schedule_api),
         )

@@ -951,9 +951,9 @@ checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
 name = "hugo-build"
-version = "0.119.0"
+version = "0.120.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75ed4cfef06e96c471575de98ed1b611124a98c9ba33e0929287304a1efb1cab"
+checksum = "bb502525f87988a6ca5bfc76445e7f944608adb1694c644a7fbe8f86fd48c834"
 dependencies = [
  "flate2",
  "reqwest",

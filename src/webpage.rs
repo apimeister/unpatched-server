@@ -79,7 +79,11 @@ mod tests {
         assert_eq!(web.status(), axum::http::StatusCode::OK);
         let web = web_page(Uri::from_static("/")).await;
         assert_eq!(web.status(), axum::http::StatusCode::OK);
+    }
+    
+    #[tokio::test]
+    async fn test_web_page_not_found() {
         let web = web_page(Uri::from_static("/agents2")).await;
-        assert_eq!(web.status(), axum::http::StatusCode::OK);
+        assert_eq!(web.status(), axum::http::StatusCode::NOT_FOUND);
     }
 }

@@ -282,10 +282,10 @@ where
             let TypedHeader(Authorization(bearer)) = parts
                 .extract::<TypedHeader<Authorization<Bearer>>>()
                 .await
-                .map_err(|_|{
+                .map_err(|_| {
                     eprintln!("bearer token not found");
                     AuthError::InvalidToken
-                } )?;
+                })?;
             bearer.token().to_string()
         } else if parts.headers.contains_key(axum::http::header::COOKIE) {
             // Extract the token from cookie

@@ -54,13 +54,12 @@ pub async fn web_page(uri: Uri) -> Response {
                 }
                 None => {
                     return (
-                        StatusCode::OK,
+                        StatusCode::NOT_FOUND,
                         header,
                         crate::WEBPAGE
                             .get_file("404.html")
-                            .unwrap()
-                            .contents_utf8()
-                            .unwrap(),
+                            .map(|e| e.contents_utf8().unwrap_or_default())
+                            .unwrap_or("404"),
                     )
                         .into_response()
                 }

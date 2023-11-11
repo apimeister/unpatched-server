@@ -282,26 +282,34 @@ where
             let TypedHeader(Authorization(bearer)) = parts
                 .extract::<TypedHeader<Authorization<Bearer>>>()
                 .await
-                .map_err(|_| AuthError::InvalidToken)?;
+                .map_err(|_|{
+                    eprintln!("bearer token not found");
+                    AuthError::InvalidToken
+                } )?;
             bearer.token().to_string()
         } else if parts.headers.contains_key(axum::http::header::COOKIE) {
             // Extract the token from cookie
-            let TypedHeader(cookies) = parts
-                .extract::<TypedHeader<Cookie>>()
-                .await
-                .map_err(|_| AuthError::InvalidToken)?;
+            let TypedHeader(cookies) =
+                parts.extract::<TypedHeader<Cookie>>().await.map_err(|_| {
+                    eprintln!("no cookie found in header");
+                    AuthError::InvalidToken
+                })?;
             let Some(coo) = cookies.get("unpatched_token") else {
+                eprintln!("cookie name not found in header");
                 return Err(AuthError::InvalidToken);
             };
             coo.to_string()
         } else {
+            eprintln!("no auth header or cookie found");
             return Err(AuthError::InvalidToken);
         };
         // Decode the user data
-        let token_data = match decode::<Claims>(&token, &KEYS.decoding, &Validation::default()) {
+        let mut validation = Validation::default();
+        validation.set_audience(&["unpatched-server-users"]);
+        let token_data = match decode::<Claims>(&token, &KEYS.decoding, &validation) {
             Ok(a) => a,
             Err(e) => {
-                error!("{e}");
+                error!("token decode failed: {e:?}");
                 return Err(AuthError::InvalidToken);
             }
         };
@@ -365,7 +373,7 @@ impl Default for Claims {
         Claims {
             iss: Default::default(),
             sub: EmailAddress::new_unchecked("default@default.int"),
-            aud: Default::default(),
+            aud: "unpatched-server-users".to_string(),
             exp: Default::default(),
             nbf: Default::default(),
             iat: Default::default(),
@@ -438,57 +446,6 @@ pub async fn remove_ip_from_blacklist_api(
     let filter = format!("id='{id}'",);
     delete_blacklistitems_from_db(Some(&filter), pool.acquire().await.unwrap()).await
 }
-
-// FIXME: Make this work
-
-// #[derive(Debug, Clone)]
-// pub struct AuthLayer {
-//     target: &'static str,
-// }
-
-// impl<S> Layer<S> for AuthLayer {
-//     type Service = AuthService<S>;
-
-//     fn layer(&self, service: S) -> Self::Service {
-//         AuthService {
-//             target: self.target,
-//             service,
-//         }
-//     }
-// }
-
-// impl AuthLayer {
-//     pub fn verify() -> Self {
-//         error!("loaded auth layer");
-//         AuthLayer { target: "auth" }
-//     }
-// }
-// // This service implements the Log behavior
-// #[derive(Clone)]
-// pub struct AuthService<S> {
-//     target: &'static str,
-//     service: S,
-// }
-
-// impl<S, Request> Service<Request> for AuthService<S>
-// where
-//     S: Service<Request>,
-//     Request: std::fmt::Debug,
-// {
-//     type Response = S::Response;
-//     type Error = S::Error;
-//     type Future = S::Future;
-
-//     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-//         self.service.poll_ready(cx)
-//     }
-
-//     fn call(&mut self, request: Request) -> Self::Future {
-//         // Insert log statement here or other functionality
-//         error!("request = {:?}, target = {:?}", request, self.target);
-//         self.service.call(request)
-//     }
-// }
 
 #[cfg(test)]
 mod tests {
@@ -659,9 +616,11 @@ mod tests {
             .header(COOKIE, cookies)
             .body(())
             .unwrap();
-        let claim = Claims::from_request_parts(&mut req.into_parts().0, &axum::extract::State(()))
-            .await
-            .unwrap();
+        let mut x = req.into_parts().0;
+        println!("receiving parts: {x:?}");
+        let claim = Claims::from_request_parts(&mut x, &axum::extract::State(())).await;
+        println!("claim: {claim:?}");
+        let claim = claim.unwrap();
         let prot = protected(claim.clone()).await;
         assert_eq!(
             prot.unwrap(),

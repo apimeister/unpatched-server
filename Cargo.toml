@@ -37,7 +37,7 @@ rcgen = "0.11"
 hyper = "0.14"
 
 [build-dependencies]
-hugo-build = "0.120"
+hugo-build = "0.121"
 
 [[bin]]
 name = "unpatched-server"

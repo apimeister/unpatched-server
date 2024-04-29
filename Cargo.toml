@@ -11,7 +11,7 @@ axum = { version = "0.6", features = ["ws", "headers"] }
 axum-server = { version = "0.5", features = ["tls-rustls"] }
 chrono = { version = "0.4.38", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
-cron = "0.12.0"
+cron = "0.12.1"
 email_address = "0.2.4"
 futures = "0.3"
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
